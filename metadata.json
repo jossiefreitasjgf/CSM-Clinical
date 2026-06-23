@@ -1,0 +1,6 @@
+{
+  "name": "CSM Clinical",
+  "description": "Sistema completo SaaS/CRM para Clínicas de Reabilitação, Fisioterapia Infantil e Gestão Terapêutica",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
