@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Patient, TherapeuticEvent, Registration, Appointment, FinancialTransaction, Attendance, Clinic } from '../types';
+import { exportReportPDF, exportReportExcel } from '../utils/exportUtils';
 
 interface ReportsCenterProps {
   currentClinic: Clinic;
@@ -55,13 +56,33 @@ export default function ReportsCenter({
   const clinicApps = appointments.filter(a => a.clinicId === currentClinic.id);
   const clinicTx = transactions.filter(t => t.clinicId === currentClinic.id);
 
-  // Download simulation helpers
-  const handleDownloadExcel = (reportName: string) => {
-    alert(`Preparando planilha de auditoria para ${reportName}.xlsx... Download concluído com sucesso!`);
+  // Real Excel and PDF download triggers
+  const handleDownloadExcel = () => {
+    exportReportExcel(chosenReport, currentClinic.name, {
+      clinicRegs,
+      clinicPatients,
+      clinicTx,
+      clinicApps,
+      attendances,
+      selectedEventId,
+      selectedPatientId,
+      events,
+      patients
+    });
   };
 
   const handlePrintPDF = () => {
-    window.print();
+    exportReportPDF(chosenReport, currentClinic.name, {
+      clinicRegs,
+      clinicPatients,
+      clinicTx,
+      clinicApps,
+      attendances,
+      selectedEventId,
+      selectedPatientId,
+      events,
+      patients
+    });
   };
 
   return (
@@ -79,8 +100,8 @@ export default function ReportsCenter({
 
         <div className="flex gap-2">
           <button
-            onClick={() => handleDownloadExcel(chosenReport.toUpperCase())}
-            className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-500/15 border border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-450 text-xs font-bold rounded-xl hover:bg-emerald-100/50 transition-all cursor-pointer"
+            onClick={handleDownloadExcel}
+            className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-550/15 border border-emerald-100 dark:border-emerald-900/30 text-emerald-600 dark:text-emerald-450 text-xs font-bold rounded-xl hover:bg-emerald-100/50 transition-all cursor-pointer"
           >
             <Download className="w-4 h-4" /> Exportar Planilha Excel
           </button>
@@ -164,7 +185,7 @@ export default function ReportsCenter({
                   <th className="py-3 px-2">Data Matrícula</th>
                   <th className="py-3 px-2">Comprovante Pix</th>
                   <th className="py-3 px-2 text-center">Status</th>
-                  <th className="py-3 px-2 text-right">Ação CRM</th>
+                  <th className="py-3 px-2 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>

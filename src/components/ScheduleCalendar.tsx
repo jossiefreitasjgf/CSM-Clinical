@@ -136,8 +136,8 @@ export default function ScheduleCalendar({
           <h2 className="text-xl font-extrabold text-slate-800 dark:text-white flex items-center gap-2">
             📅 Agenda de Atendimentos Pediátricos
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Planeje sessões de fisioterapia motor, integração sensorial e estimulações lúdicas para as crianças do CRM.
+          <p className="text-xs text-slate-500 dark:text-slate-350 mt-1">
+            Planeje sessões de fisioterapia motor, integração sensorial e estimulações lúdicas para as crianças da clínica.
           </p>
         </div>
         

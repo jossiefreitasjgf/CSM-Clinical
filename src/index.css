@@ -26,6 +26,109 @@ body {
   color: #2D312E;
 }
 
+/* Custom highly polished rules for high text and shape contrast (Módulo 11/12 and User Request) */
+
+/* 1. LIGHT MODE CONTRAST BOOSTS (where backgrounds are light, make text/shapes stand out clearly) */
+div:not(.dark) .text-slate-400 {
+  color: #475569 !important; /* Standout slate-600 */
+}
+div:not(.dark) .text-slate-450 {
+  color: #334155 !important; /* Standout slate-700 */
+}
+div:not(.dark) .text-slate-300 {
+  color: #64748b !important; /* Standout slate-500 */
+}
+div:not(.dark) .text-slate-500 {
+  color: #1e293b !important; /* Standout slate-800 */
+}
+div:not(.dark) .text-gray-400 {
+  color: #475569 !important; /* Standout slate-600 */
+}
+div:not(.dark) .text-\[\#8A9F94\] {
+  color: #223c2d !important; /* Deeper contrast sage/charcoal */
+}
+div:not(.dark) .text-\[\#9BB0A5\] {
+  color: #172c20 !important; /* Deeper sage */
+}
+div:not(.dark) .text-\[\#A2C4D2\] {
+  color: #123547 !important; /* Deeper contrast blue */
+}
+div:not(.dark) .text-\[\#F27D26\] {
+  color: #b14800 !important; /* Deeper high-contrast orange */
+}
+
+/* Light mode card/form borders & inputs standing out beautifully */
+div:not(.dark) .border-\[\#E5E3DB\] {
+  border-color: #cbd5e1 !important; /* Standout grey */
+}
+div:not(.dark) .border-slate-200 {
+  border-color: #cbd5e1 !important; /* Standout grey */
+}
+div:not(.dark) .border-slate-100 {
+  border-color: #cbd5e1 !important; /* Standout light-grey */
+}
+div:not(.dark) input,
+div:not(.dark) select,
+div:not(.dark) textarea {
+  border-color: #94a3b8 !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+div:not(.dark) input::placeholder,
+div:not(.dark) textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* 2. DARK MODE CONTRAST BOOSTS (where backgrounds are dark, make elements stand out clearly) */
+.dark .text-slate-300 {
+  color: #f3f4f6 !important; /* Highly bright gray-100 */
+}
+.dark .text-slate-400 {
+  color: #f9fafb !important; /* Highly bright gray-50 */
+}
+.dark .text-slate-450 {
+  color: #f3f4f6 !important;
+}
+.dark .text-slate-500 {
+  color: #e5e7eb !important; /* Gray-200 */
+}
+.dark .text-\[\#8A9F94\] {
+  color: #d1e2d7 !important; /* Bright readable sage */
+}
+.dark .text-\[\#9BB0A5\] {
+  color: #e2ede7 !important; /* Bright sage */
+}
+.dark .text-\[\#A2C4D2\] {
+  color: #d1ecf9 !important; /* Light sky blue */
+}
+.dark .text-\[\#F27D26\] {
+  color: #ffa15c !important; /* Warm neon orange */
+}
+
+/* Dark mode inputs, selects, textareas standing out beautifully */
+.dark input,
+.dark select,
+.dark textarea {
+  border-color: #4b5563 !important; /* Slate-600 */
+  background-color: #111827 !important; /* Deep dark gray */
+  color: #f9fafb !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #9ca3af !important;
+}
+.dark .border-\[\#2E3832\] {
+  border-color: #495c4f !important; /* stand out borders */
+}
+
+/* Premium micro shadows to pop out cards */
+div:not(.dark) .bg-white {
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.02) !important;
+}
+.dark .bg-\[\#242D28\] {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+}
+
 /* Base override for beautiful editorial aesthetic */
 h1, h2, .font-serif-editorial {
   font-style: normal;

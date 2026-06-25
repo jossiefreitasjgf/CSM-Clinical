@@ -22,6 +22,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { UserRole, Clinic, Registration, Appointment, TherapeuticEvent } from '../types';
+import csmLogo from '../assets/images/csm_logo_official_1782404025347.jpg';
 
 interface SidebarProps {
   activeTab: string;
@@ -170,7 +171,8 @@ export default function Sidebar({
   // Define available menu links based on the user group role guidelines (Módulo 12)
   const menuItems = [
     { id: 'dashboard', label: 'Painel Geral', icon: BarChart3, roles: ['Admin', 'Fisio', 'Recepcao'] },
-    { id: 'patients', label: 'Prontuários & CRM', icon: Users, roles: ['Admin', 'Fisio'] },
+    { id: 'patients', label: 'Prontuários & Pacientes', icon: Users, roles: ['Admin', 'Fisio'] },
+    { id: 'busca_estudos', label: 'Estudos & Tratamentos', icon: Sparkles, roles: ['Admin', 'Fisio'] },
     { id: 'agenda', label: 'Agenda Clínica', icon: CalendarIcon, roles: ['Admin', 'Fisio', 'Recepcao'] },
     { id: 'eventos', label: 'Gestão de Eventos', icon: CalendarDays, roles: ['Admin', 'Fisio', 'Recepcao'] },
     { id: 'financeiro', label: 'Financeiro', icon: DollarSign, roles: ['Admin', 'Recepcao'] },
@@ -188,16 +190,16 @@ export default function Sidebar({
       {/* Brand Header */}
       <div className="p-6 border-b border-inherit flex items-center justify-between relative">
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className="w-10 h-10 bg-white rounded-full flex-shrink-0 flex items-center justify-center shadow-sm">
-            <span className="text-[#9BB0A5] font-bold text-lg font-serif">CSM</span>
-          </div>
+          <img 
+            src={csmLogo} 
+            alt="CSM Clinical Logo" 
+            referrerPolicy="no-referrer"
+            className="w-10 h-10 bg-white rounded-xl flex-shrink-0 object-contain shadow-sm border border-slate-100 p-0.5"
+          />
           <div className="truncate">
             <h1 className="font-serif italic font-semibold text-xl tracking-tight leading-none">
               CSM Clinical
             </h1>
-            <span className="text-[9px] font-bold tracking-widest uppercase opacity-75 block mt-0.5 font-sans whitespace-nowrap">
-              CRM TERAPÊUTICO
-            </span>
           </div>
         </div>
 
@@ -467,9 +469,9 @@ export default function Sidebar({
                 setCurrentRole(role);
                 // Adjust views if active view is not permitted on role change
                 const correspondingMap: Record<string, string[]> = {
-                  Desenvolvedor: ['dashboard', 'patients', 'agenda', 'eventos', 'financeiro', 'relatorios', 'comunicacao', 'clinicas'],
-                  Admin: ['dashboard', 'patients', 'agenda', 'eventos', 'financeiro', 'relatorios', 'comunicacao'],
-                  Fisio: ['dashboard', 'patients', 'agenda', 'eventos', 'relatorios'],
+                  Desenvolvedor: ['dashboard', 'patients', 'busca_estudos', 'agenda', 'eventos', 'financeiro', 'relatorios', 'comunicacao', 'clinicas'],
+                  Admin: ['dashboard', 'patients', 'busca_estudos', 'agenda', 'eventos', 'financeiro', 'relatorios', 'comunicacao'],
+                  Fisio: ['dashboard', 'patients', 'busca_estudos', 'agenda', 'eventos', 'relatorios'],
                   Recepcao: ['dashboard', 'agenda', 'eventos', 'financeiro']
                 };
                 if (!correspondingMap[role].includes(activeTab)) {

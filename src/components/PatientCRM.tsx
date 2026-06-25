@@ -29,6 +29,7 @@ import {
   Bookmark
 } from 'lucide-react';
 import { Patient, EvolutionaryAssessment, MedicalRecord, TherapeuticEvent, Registration, Attendance, Clinic } from '../types';
+import { exportPatientChartPDF } from '../utils/exportUtils';
 
 export interface HomePrescription {
   id: string;
@@ -500,8 +501,8 @@ export default function PatientCRM({
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => {
-                      alert(`Iniciando geração de Prontuário Médico completo de ${activePatient.name} em PDF...`);
-                      window.print();
+                      const records = medicalRecords.filter(m => m.patientId === activePatient.id);
+                      exportPatientChartPDF(activePatient, records, currentClinic.name);
                     }}
                     className="p-1 px-3 text-[10px] font-black bg-indigo-50 dark:bg-indigo-550/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/30 rounded-xl hover:bg-indigo-100/50 transition-all flex items-center gap-1 cursor-pointer"
                   >
@@ -1229,9 +1230,9 @@ export default function PatientCRM({
 
           </div>
         ) : (
-          <div className="p-8 text-center text-slate-400 bg-white rounded-3xl border border-slate-100">
-            <AlertCircle className="w-10 h-10 mx-auto text-slate-300 mb-2" />
-            <p className="text-sm font-semibold italic">Cadastre seu primeiro paciente no botão de CRM lateral.</p>
+          <div className="p-8 text-center text-slate-500 dark:text-slate-350 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800">
+            <AlertCircle className="w-10 h-10 mx-auto text-slate-400 mb-2" />
+            <p className="text-sm font-semibold italic">Cadastre seu primeiro paciente clicando em "+ Novo Paciente".</p>
           </div>
         )}
       </div>
@@ -1413,7 +1414,7 @@ export default function PatientCRM({
                   type="submit"
                   className="px-5 py-2.5 text-xs font-bold rounded-xl bg-teal-500 hover:bg-teal-600 text-white transition-all cursor-pointer"
                 >
-                  Salvar Paciente no CRM
+                  Salvar Cadastro do Paciente
                 </button>
               </div>
             </form>

@@ -5,6 +5,7 @@ import { auth, db } from '../firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 import { saveDocument } from '../services/dbService';
+import csmLogo from '../assets/images/csm_logo_official_1782404025347.jpg';
 
 interface LoginProps {
   systemUsers: SystemUser[];
@@ -260,18 +261,13 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
       <div className="w-full max-w-md space-y-6">
         
         {/* App Logo/Header */}
-        <div id="login-brand" className="text-center space-y-2 select-none">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-3xl bg-[#FA8F3B] text-white shadow-md animate-pulse">
-            <Baby className="w-8 h-8" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-850 dark:text-white flex items-center justify-center gap-1.5 font-serif">
-              LúdicoPed <span className="text-xs bg-[#8A9F94]/15 text-[#8A9F94] dark:text-[#9BB0A5] px-2 py-0.5 rounded-full font-sans font-extrabold select-none">SaaS</span>
-            </h1>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-              Portal Multi-Clínicas de Terapia Psicomotora
-            </p>
-          </div>
+        <div id="login-brand" className="text-center space-y-3 select-none flex flex-col items-center animate-fade-in">
+          <img 
+            src={csmLogo} 
+            alt="CSM Clinical Logo" 
+            referrerPolicy="no-referrer"
+            className="w-48 h-48 object-contain rounded-3xl bg-white p-3 border border-slate-200/80 dark:border-[#2E3832]/80 shadow-md transition-transform hover:scale-105 duration-300"
+          />
         </div>
 
         {/* Outer Form Frame */}
@@ -355,52 +351,12 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
             </div>
           ) : (
             <>
-              {/* Tab Selection */}
-          <div className="flex border-b border-slate-100 dark:border-[#2E3832] mb-6">
-            <button
-              id="tab-login"
-              type="button"
-              onClick={() => {
-                setIsRegistering(false);
-                setErrorMsg('');
-                setSuccessMsg('');
-              }}
-              className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 flex items-center justify-center gap-1.5 transition-all ${
-                !isRegistering
-                  ? 'border-[#FA8F3B] text-[#FA8F3B]'
-                  : 'border-transparent text-slate-400 hover:text-slate-500'
-              }`}
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              Entrar
-            </button>
-            <button
-              id="tab-register"
-              type="button"
-              onClick={() => {
-                setIsRegistering(true);
-                setErrorMsg('');
-                setSuccessMsg('');
-              }}
-              className={`flex-1 pb-3 text-xs font-bold uppercase tracking-wider text-center border-b-2 flex items-center justify-center gap-1.5 transition-all ${
-                isRegistering
-                  ? 'border-[#FA8F3B] text-[#FA8F3B]'
-                  : 'border-transparent text-slate-400 hover:text-slate-500'
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              Criar Conta
-            </button>
-          </div>
-
           <div className="space-y-1 mb-5 text-center">
             <h2 className="text-base font-black text-slate-800 dark:text-white">
-              {isRegistering ? 'Novo Acesso de Teste' : 'Acesse o Sistema'}
+              Acesse o Sistema
             </h2>
-            <p className="text-xs text-slate-400">
-              {isRegistering 
-                ? 'Preencha os campos para simular um novo usuário SaaS de teste' 
-                : 'Insira as credenciais do seu perfil habilitado'}
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Insira as credenciais do seu perfil habilitado
             </p>
           </div>
 
@@ -421,9 +377,9 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               
               <div className="space-y-1.5">
-                <label htmlFor="login-username" className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Nome ou E-mail</label>
+                <label htmlFor="login-username" className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-300 tracking-wider block">Nome ou E-mail</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-2.5 w-4.5 h-4.5 text-slate-350" />
+                  <User className="absolute left-3 top-2.5 w-4.5 h-4.5 text-slate-400 dark:text-slate-300" />
                   <input
                     id="login-username"
                     type="text"
@@ -434,16 +390,16 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
                     className={`w-full text-xs font-semibold rounded-xl px-10 py-2.5 outline-none border transition-all ${
                       darkMode 
                         ? 'bg-[#242D28] border-[#2E3832] text-white focus:border-[#9BB0A5]' 
-                        : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-slate-350'
+                        : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-slate-400'
                     }`}
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="login-password" className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Senha Secreta</label>
+                <label htmlFor="login-password" className="text-[10px] uppercase font-bold text-slate-600 dark:text-slate-300 tracking-wider block">Senha Secreta</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-2.5 w-4.5 h-4.5 text-slate-350" />
+                  <Lock className="absolute left-3 top-2.5 w-4.5 h-4.5 text-slate-400 dark:text-slate-300" />
                   <input
                     id="login-password"
                     type={showPassword ? 'text' : 'password'}
@@ -454,13 +410,13 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
                     className={`w-full text-xs font-semibold rounded-xl px-10 py-2.5 outline-none border transition-all ${
                       darkMode 
                         ? 'bg-[#242D28] border-[#2E3832] text-white focus:border-[#9BB0A5]' 
-                        : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-slate-350'
+                        : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-slate-400'
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-slate-350 hover:text-slate-500 cursor-pointer"
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:text-slate-300 dark:hover:text-white cursor-pointer"
                     title={showPassword ? 'Ocultar Senha' : 'Exibir Senha'}
                   >
                     {showPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}

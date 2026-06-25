@@ -37,6 +37,7 @@ import ClinicSettings from './components/ClinicSettings';
 import CommunicationSettings from './components/CommunicationSettings';
 import PublicRegistration from './components/PublicRegistration';
 import { Login } from './components/Login';
+import StudySearch from './components/StudySearch';
 
 export default function App() {
   // Master database state definitions synchronized with Firebase
@@ -958,6 +959,12 @@ export default function App() {
           <CommunicationSettings
             currentClinic={currentClinic}
             onUpdateClinicDetails={handleUpdateClinicDetails}
+            darkMode={darkMode}
+          />
+        )}
+
+        {activeTab === 'busca_estudos' && (
+          <StudySearch 
             darkMode={darkMode}
           />
         )}

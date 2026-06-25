@@ -18,6 +18,7 @@ import {
   Receipt
 } from 'lucide-react';
 import { TherapeuticEvent, Registration, Patient, FinancialTransaction } from '../types';
+import { exportRegistrationReceiptPDF } from '../utils/exportUtils';
 
 interface PublicRegistrationProps {
   events: TherapeuticEvent[];
@@ -194,7 +195,7 @@ export default function PublicRegistration({
       {/* Decentered Top Indicator */}
       <div className="bg-indigo-900 text-white py-3 px-4 text-center text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
         <Sparkles className="w-4 h-4 text-amber-400" />
-        <span>Ambiente de Inscrição Oficial - Clínica Integrada CSM Clinical CRM</span>
+        <span>Ambiente de Inscrição Oficial - Clínica Integrada CSM Clinical</span>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 mt-8">
@@ -246,7 +247,7 @@ export default function PublicRegistration({
                 <h4 className="text-xs font-bold uppercase tracking-wider">Atalho de Simulação Terapêutica (Developer Tool)</h4>
               </div>
               <p className="text-[11px] text-amber-700 leading-relaxed mb-3">
-                Para fins de teste e demonstração do CRM, preencha os formulários automaticamente selecionando um dos pacientes pré-cadastrados na base clínica:
+                Para fins de teste e demonstração do sistema, preencha os formulários automaticamente selecionando um dos pacientes pré-cadastrados na base clínica:
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {patients.slice(0, 4).map(p => (
@@ -683,7 +684,23 @@ export default function PublicRegistration({
                   <Printer className="w-4 h-4 text-slate-500" /> Imprimir Comprovante
                 </button>
                 <button
-                  onClick={() => alert(`Simulando download de ${finalRegistrationNumber}.pdf no seu dispositivo!`)}
+                  onClick={() => {
+                    const regObj: Registration = {
+                      id: 'temp',
+                      clinicId: 'temp',
+                      eventId: currentEvent.id,
+                      childId: 'temp',
+                      childName: childName,
+                      parentName: guardianName,
+                      registrationNumber: finalRegistrationNumber,
+                      date: new Date().toISOString().substring(0, 10),
+                      status: 'Aprovado',
+                      paymentReceiptName: 'comprovante_pix.pdf',
+                      paymentReceiptSize: '120 KB',
+                      ageCalculated: Number(age)
+                    };
+                    exportRegistrationReceiptPDF(regObj, currentEvent, 'CSM CLINICAL');
+                  }}
                   className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 text-xs font-bold rounded-2xl transition-all shadow-sm"
                 >
                   <Download className="w-4 h-4" /> Baixar Comprovante PDF
