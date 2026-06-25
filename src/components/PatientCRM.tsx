@@ -1171,9 +1171,9 @@ export default function PatientCRM({
                             <div className="flex items-center gap-2 self-end sm:self-start flex-shrink-0">
                               <button
                                 onClick={() => {
-                                  const configWa = localStorage.getItem('csm_whatsapp_linked');
+                                  const configWa = currentClinic.whatsapp || localStorage.getItem('csm_whatsapp_linked');
                                   if (!configWa) {
-                                    alert('⚠️ WhatsApp não configurado! Acesse SaaS Multi-Clínica -> Configurações Administrativas para conectar o celular oficial.');
+                                    alert('⚠️ WhatsApp não configurado! Acesse SaaS Multi-Clínica -> Modos de Comunicação para conectar o celular oficial.');
                                     return;
                                   }
                                   

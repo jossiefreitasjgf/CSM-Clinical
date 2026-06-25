@@ -10,6 +10,10 @@ export interface Clinic {
   status: 'Ativo' | 'Inativo';
   responsibleDoctor?: string;
   financialManager?: string;
+  whatsapp?: string;
+  whatsappApiUrl?: string;
+  whatsappApiToken?: string;
+  whatsappApiInstance?: string;
 }
 
 export interface SystemUser {

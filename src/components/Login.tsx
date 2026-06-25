@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { KeyRound, User, Lock, ArrowRight, Baby, Eye, EyeOff, ShieldCheck, Sparkles, Building2, UserPlus, LogIn } from 'lucide-react';
+import { KeyRound, User, Lock, ArrowRight, Baby, Eye, EyeOff, ShieldCheck, Building2, UserPlus, LogIn } from 'lucide-react';
 import { SystemUser, Clinic, UserRole } from '../types';
+import { auth, db } from '../firebase';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
+import { saveDocument } from '../services/dbService';
 
 interface LoginProps {
   systemUsers: SystemUser[];
@@ -39,7 +43,7 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
 
-  const handleRecoverPassword = (e: React.FormEvent) => {
+  const handleRecoverPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setRecoveryError('');
     setRecoveryMessage('');
@@ -49,68 +53,121 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
       return;
     }
 
-    const matchedUser = systemUsers.find(
-      (u) => u.email.toLowerCase() === recoveryEmail.toLowerCase().trim()
-    );
+    try {
+      const cleanEmail = recoveryEmail.toLowerCase().trim();
+      
+      // Look up user in Firestore first
+      const userSnap = await getDoc(doc(db, 'users', cleanEmail));
 
-    if (matchedUser) {
-      setRecoveryMessage(`Instruções enviadas! Sua senha cadastrada é: "${matchedUser.password || '1234'}"`);
-    } else {
-      setRecoveryError('E-mail não localizado na base de dados.');
+      if (!userSnap.exists()) {
+        setRecoveryError('E-mail não localizado na base de dados de usuários autorizados.');
+        return;
+      }
+
+      const userData = userSnap.data() as SystemUser;
+
+      // Call standard Firebase password reset email
+      try {
+        await sendPasswordResetEmail(auth, cleanEmail);
+        setRecoveryMessage(`Instruções de redefinição de senha enviadas com sucesso para ${cleanEmail}! Acesse o seu e-mail para cadastrar sua nova senha.`);
+      } catch (authErr: any) {
+        // If they are in Firestore but not yet in Firebase Auth
+        if (authErr.code === 'auth/user-not-found') {
+          // Register them in Auth first so they have an account, then send reset email
+          const tempPassword = userData.password || '1234';
+          const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, tempPassword);
+          await sendEmailVerification(userCred.user);
+          await sendPasswordResetEmail(auth, cleanEmail);
+          setRecoveryMessage(`Instruções de confirmação de cadastro e redefinição de senha enviadas com sucesso para ${cleanEmail}! Acesse o seu e-mail para cadastrar sua nova senha.`);
+        } else {
+          setRecoveryError(`Erro de autenticação: ${authErr.message}`);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      setRecoveryError(`Erro ao buscar e-mail: ${err.message}`);
     }
   };
 
   // Form Submission handles
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
       if (!usernameOrEmail || !password) {
         setErrorMsg('Por favor, digite suas credenciais.');
         setIsSubmitting(false);
         return;
       }
 
-      const matchedUser = systemUsers.find(
-        (user) =>
-          (user.email.toLowerCase() === usernameOrEmail.toLowerCase() ||
-           user.name.toLowerCase() === usernameOrEmail.toLowerCase()) &&
-          (user.password === password || (!user.password && password === '1234'))
-      );
+      const cleanEmail = usernameOrEmail.toLowerCase().trim();
+      
+      // 1. Look up user in Firestore
+      const userSnap = await getDoc(doc(db, 'users', cleanEmail));
 
-      if (matchedUser) {
-        if (matchedUser.status === 'Inativo') {
-          setErrorMsg('Acesso indisponível: este usuário está Inativo no painel SaaS.');
-          setIsSubmitting(false);
-          return;
-        }
-        localStorage.setItem('csm_session_user', JSON.stringify(matchedUser));
-        onLoginSuccess(matchedUser);
-      } else {
-        setErrorMsg('Oops! Credenciais inválidas. Verifique seu e-mail e sua senha cadastrada.');
+      if (!userSnap.exists()) {
+        setErrorMsg('Oops! Credenciais inválidas ou usuário não cadastrado. O acesso deve ser criado por um Administrador ou pelo Desenvolvedor.');
+        setIsSubmitting(false);
+        return;
       }
+
+      const matchedUser = { id: userSnap.id, ...userSnap.data() } as SystemUser;
+
+      if (matchedUser.status === 'Inativo') {
+        setErrorMsg('Acesso indisponível: este usuário está Inativo no painel SaaS.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Authenticate via Firebase Auth
+      try {
+        await signInWithEmailAndPassword(auth, cleanEmail, password);
+        setSuccessMsg('Login realizado com sucesso! Carregando painel...');
+      } catch (authError: any) {
+        // If user is registered in Firestore but not yet in Firebase Auth (first login)
+        if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-credential') {
+          // Let's check if password matches the one defined in Firestore (fallback to '1234')
+          const expectedPassword = matchedUser.password || '1234';
+          if (password === expectedPassword) {
+            // Create Auth account automatically!
+            const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+            await sendEmailVerification(userCred.user);
+            setSuccessMsg('Primeiro acesso configurado com sucesso! Carregando painel...');
+          } else {
+            setErrorMsg('Senha incorreta. Verifique suas credenciais.');
+          }
+        } else {
+          setErrorMsg(`Erro de autenticação: ${authError.message}`);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(`Erro ao acessar o banco de dados: ${err.message}`);
+    } finally {
       setIsSubmitting(false);
-    }, 400);
+    }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
       if (!regName.trim() || !regEmail.trim() || !regPassword) {
         setErrorMsg('Por favor, preencha todos os campos obrigatórios.');
         setIsSubmitting(false);
         return;
       }
 
+      const cleanEmail = regEmail.toLowerCase().trim();
+
       // Basic email verification
-      if (!regEmail.includes('@') || !regEmail.includes('.')) {
+      if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
         setErrorMsg('Por favor, insira um endereço de e-mail válido.');
         setIsSubmitting(false);
         return;
@@ -123,37 +180,52 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
         return;
       }
 
-      // Check if email already registered
-      const hasEmail = systemUsers.some(
-        (user) => user.email.toLowerCase() === regEmail.toLowerCase().trim()
-      );
+      // Check if email already registered in Firestore
+      const userSnap = await getDoc(doc(db, 'users', cleanEmail));
 
-      if (hasEmail) {
+      if (userSnap.exists()) {
         setErrorMsg('E-mail já cadastrado no sistema LúdicoPed SaaS. Tente acessar ou use outro e-mail.');
         setIsSubmitting(false);
         return;
       }
 
-      // Succesfully register user
-      const newUserPayload = {
+      const isDev = cleanEmail === 'jossiefreitas.jgf@gmail.com';
+      const role: UserRole = isDev ? 'Desenvolvedor' : regRole;
+
+      // Create new user record in Firestore
+      const newUserPayload: SystemUser = {
+        id: cleanEmail,
         clinicId: regClinicId,
         name: regName.trim(),
-        email: regEmail.toLowerCase().trim(),
-        role: regEmail.toLowerCase().trim() === 'jossiefreitas.jgf@gmail.com' ? 'Desenvolvedor' as const : regRole,
+        email: cleanEmail,
+        role: role,
         status: 'Ativo' as const,
+        createdAt: new Date().toISOString().split('T')[0],
         password: regPassword
       };
 
-      onRegisterUser(newUserPayload);
-      setSuccessMsg('Conta criada com sucesso! Redirecionando...');
+      await saveDocument('users', cleanEmail, newUserPayload);
+
+      // Create in Firebase Auth & send confirmation link
+      try {
+        const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, regPassword);
+        await sendEmailVerification(userCred.user);
+      } catch (authErr) {
+        console.warn("Could not create Firebase Auth account during signup (already exists or offline):", authErr);
+      }
+
+      setSuccessMsg('Cadastro realizado com sucesso! Um e-mail de confirmação foi disparado.');
 
       // Clear register states
       setRegName('');
       setRegEmail('');
       setRegPassword('');
-      
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(`Erro ao realizar cadastro: ${err.message}`);
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
 
   const handleQuickFill = (user: SystemUser) => {
@@ -563,50 +635,6 @@ export function Login({ systemUsers, onLoginSuccess, onRegisterUser, darkMode, s
               </button>
             </form>
           )}
-
-          {/* Quick tester support shortcut list */}
-          <div className="mt-6 pt-5 border-t border-slate-150 dark:border-[#2E3832]/60">
-            <p className="text-[10px] font-black uppercase text-center text-[#FA8F3B] dark:text-[#9BB0A5] tracking-widest flex items-center justify-center gap-1 leading-none">
-              <Sparkles className="w-3.5 h-3.5" /> Facilitador de Teste Rápido
-            </p>
-            <p className="text-[9.5px] text-slate-400 text-center mt-1 leading-snug">
-              Clique em um perfil seeded para preencher e validar os privilégios de acesso:
-            </p>
-            
-            <div className="grid grid-cols-1 gap-2 mt-3">
-              {systemUsers.slice(0, 3).map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => handleQuickFill(user)}
-                  type="button"
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    darkMode
-                      ? 'bg-[#121614] border-[#2C3530] text-slate-300 hover:bg-[#252E2A] hover:border-[#9BB0A5]'
-                      : 'bg-slate-50 border-slate-200 text-slate-650 hover:bg-white hover:border-slate-350 hover:shadow-xs'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold block">{user.name}</span>
-                    <span className={`text-[8.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                      user.role === 'Desenvolvedor'
-                        ? 'bg-purple-500/10 text-purple-650 dark:text-purple-400'
-                        : user.role === 'Admin'
-                          ? 'bg-amber-500/10 text-amber-505 dark:text-amber-400'
-                          : user.role === 'Fisio'
-                            ? 'bg-teal-500/10 text-teal-605'
-                            : 'bg-indigo-500/10 text-indigo-505'
-                    }`}>
-                      {user.role}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-[9px] text-slate-400 mt-0.5 font-mono">
-                    <span>E-mail: {user.email}</span>
-                    <span>Senha: <strong className="text-orange-500 font-bold">{user.password || '1234'}</strong></span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
           </>
           )}
 

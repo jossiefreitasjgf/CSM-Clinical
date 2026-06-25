@@ -1,17 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  initialClinics, 
-  initialEvents, 
-  initialPatients, 
-  initialRegistrations, 
-  initialAssessments, 
-  initialMedicalRecords, 
-  initialAppointments, 
-  initialTransactions, 
-  initialAttendances,
-  initialSystemUsers
-} from './data/seedData';
-import { 
   Clinic, 
   TherapeuticEvent, 
   Patient, 
@@ -24,9 +12,20 @@ import {
   UserRole,
   SystemUser
 } from './types';
+import { db, auth } from './firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { 
+  COLLECTIONS,
+  seedDatabaseIfNeeded,
+  subscribeCollection,
+  saveDocument,
+  removeDocument,
+  getDocument
+} from './services/dbService';
 
 // Component imports
-import { Menu } from 'lucide-react';
+import { Menu, Lock, KeyRound, Eye, EyeOff, CheckCircle2, XCircle, LogOut } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import PatientCRM from './components/PatientCRM';
@@ -35,198 +34,119 @@ import EventManagement from './components/EventManagement';
 import FinancialHub from './components/FinancialHub';
 import ReportsCenter from './components/ReportsCenter';
 import ClinicSettings from './components/ClinicSettings';
+import CommunicationSettings from './components/CommunicationSettings';
 import PublicRegistration from './components/PublicRegistration';
 import { Login } from './components/Login';
 
 export default function App() {
-  // Master database state definitions with localStorage persistence
-  const [clinics, setClinics] = useState<Clinic[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_clinics');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialClinics;
-  });
+  // Master database state definitions synchronized with Firebase
+  const [clinics, setClinics] = useState<Clinic[]>([]);
+  const [events, setEvents] = useState<TherapeuticEvent[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [assessments, setAssessments] = useState<EvolutionaryAssessment[]>([]);
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
 
-  const [events, setEvents] = useState<TherapeuticEvent[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_events');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialEvents;
-  });
-
-  const [patients, setPatients] = useState<Patient[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_patients');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialPatients;
-  });
-
-  const [registrations, setRegistrations] = useState<Registration[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_registrations');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialRegistrations;
-  });
-
-  const [assessments, setAssessments] = useState<EvolutionaryAssessment[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_assessments');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialAssessments;
-  });
-
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_medical_records');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialMedicalRecords;
-  });
-
-  const [appointments, setAppointments] = useState<Appointment[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_appointments');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialAppointments;
-  });
-
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_transactions');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialTransactions;
-  });
-
-  const [attendances, setAttendances] = useState<Attendance[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_attendances');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialAttendances;
-  });
-  
-  const [systemUsers, setSystemUsers] = useState<SystemUser[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_system_users');
-      if (saved) return JSON.parse(saved);
-    }
-    return initialSystemUsers;
-  });
-
-  // System User Login session state
-  const [currentUser, setCurrentUser] = useState<SystemUser | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('csm_session_user');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch (e) {
-          return null;
-        }
-      }
-    }
-    return null;
-  });
-
-  // Layout and Role configuration state
+  // System User Auth and Session state
+  const [currentUser, setCurrentUser] = useState<SystemUser | null>(null);
+  const [currentClinic, setCurrentClinic] = useState<Clinic | null>(null);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [currentRole, setCurrentRole] = useState<UserRole>('Admin');
-  
-  const [currentClinic, setCurrentClinic] = useState<Clinic>(() => {
-    if (typeof window !== 'undefined') {
-      const savedClinic = localStorage.getItem('csm_current_clinic');
-      if (savedClinic) {
-        try {
-          return JSON.parse(savedClinic);
-        } catch (e) {
-          // ignore
-        }
-      }
-      const savedClinics = localStorage.getItem('csm_clinics');
-      if (savedClinics) {
-        try {
-          const parsed = JSON.parse(savedClinics);
-          if (parsed && parsed.length > 0) return parsed[0];
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-    return initialClinics[0];
-  });
-
   const [darkMode, setDarkMode] = useState<boolean>(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
 
-  // Sync databases to localStorage when updated
-  useEffect(() => {
-    localStorage.setItem('csm_clinics', JSON.stringify(clinics));
-  }, [clinics]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_current_clinic', JSON.stringify(currentClinic));
-  }, [currentClinic]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_events', JSON.stringify(events));
-  }, [events]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_patients', JSON.stringify(patients));
-  }, [patients]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_registrations', JSON.stringify(registrations));
-  }, [registrations]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_assessments', JSON.stringify(assessments));
-  }, [assessments]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_medical_records', JSON.stringify(medicalRecords));
-  }, [medicalRecords]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_appointments', JSON.stringify(appointments));
-  }, [appointments]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_transactions', JSON.stringify(transactions));
-  }, [transactions]);
-
-  useEffect(() => {
-    localStorage.setItem('csm_attendances', JSON.stringify(attendances));
-  }, [attendances]);
-
-  // LINK: auto-sync systemUsers to local storage when changed
-  useEffect(() => {
-    localStorage.setItem('csm_system_users', JSON.stringify(systemUsers));
-  }, [systemUsers]);
-
-  // Sync role to currentUser role automatically
-  useEffect(() => {
-    if (currentUser) {
-      setCurrentRole(currentUser.role);
-    }
-  }, [currentUser]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('csm_session_user');
-    setCurrentUser(null);
-    setActiveTab('dashboard');
-  };
-
-  // Link for simulating the public registration platform
+  // Connection and first-launch states
+  const [authLoading, setAuthLoading] = useState(true);
   const [publicEventId, setPublicEventId] = useState<string | null>(null);
+
+  // Password change states for first access requirement
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordChangeError, setPasswordChangeError] = useState('');
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordChangeError('');
+    setPasswordChangeSuccess('');
+    setIsChangingPassword(true);
+
+    if (currentPasswordInput !== '1234') {
+      setPasswordChangeError('A senha atual digitada está incorreta.');
+      setIsChangingPassword(false);
+      return;
+    }
+
+    const isMinLength = newPasswordInput.length >= 8;
+    const hasLetterAndNumber = /[a-zA-Z]/.test(newPasswordInput) && /[0-9]/.test(newPasswordInput);
+    const hasUppercase = /[A-Z]/.test(newPasswordInput);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>_/\-+=~`[\]\\]/.test(newPasswordInput);
+    const passwordsMatch = newPasswordInput === confirmPasswordInput;
+
+    if (!isMinLength) {
+      setPasswordChangeError('A senha deve conter no mínimo 8 caracteres.');
+      setIsChangingPassword(false);
+      return;
+    }
+    if (!hasLetterAndNumber) {
+      setPasswordChangeError('A senha deve conter letras e números.');
+      setIsChangingPassword(false);
+      return;
+    }
+    if (!hasUppercase) {
+      setPasswordChangeError('A senha deve conter no mínimo uma letra maiúscula.');
+      setIsChangingPassword(false);
+      return;
+    }
+    if (!hasSpecialChar) {
+      setPasswordChangeError('A senha deve conter no mínimo um caractere especial (ex: @, #, $, %, etc.).');
+      setIsChangingPassword(false);
+      return;
+    }
+    if (!passwordsMatch) {
+      setPasswordChangeError('A confirmação de senha não confere.');
+      setIsChangingPassword(false);
+      return;
+    }
+    if (newPasswordInput === '1234') {
+      setPasswordChangeError('A nova senha não pode ser a senha padrão 1234.');
+      setIsChangingPassword(false);
+      return;
+    }
+
+    try {
+      if (!currentUser) return;
+      const cleanEmail = currentUser.email.toLowerCase().trim();
+      
+      const updatedUser = {
+        ...currentUser,
+        password: newPasswordInput
+      };
+      
+      await saveDocument(COLLECTIONS.USERS, cleanEmail, updatedUser);
+      
+      setCurrentUser(updatedUser);
+      setPasswordChangeSuccess('Senha alterada com sucesso! Redirecionando...');
+      
+      setCurrentPasswordInput('');
+      setNewPasswordInput('');
+      setConfirmPasswordInput('');
+    } catch (err: any) {
+      console.error(err);
+      setPasswordChangeError(`Erro ao atualizar a senha: ${err.message}`);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   // Coordinate check on page render to see if we clicked "Simulate registration" or accessed public ID
   useEffect(() => {
@@ -237,215 +157,330 @@ export default function App() {
     }
   }, []);
 
-  // Sync state when current clinic might be modified inside settings
+  // 1. AUTHENTICATION AND DATABASE SEEDING INITIALIZATION
   useEffect(() => {
-    const updated = clinics.find(c => c.id === currentClinic.id);
-    if (updated) {
-      setCurrentClinic(updated);
-    }
-  }, [clinics, currentClinic.id]);
+    const initializeAppSession = async () => {
+      // First, seed the cloud database if this is the first deployment run
+      await seedDatabaseIfNeeded();
 
-  // 1. EVENT MANAGEMENT CALLBACKS
-  const handleAddEvent = (eventData: Omit<TherapeuticEvent, 'id' | 'clinicId'>) => {
-    const newEvent: TherapeuticEvent = {
-      ...eventData,
-      id: `event-${Date.now()}`,
-      clinicId: currentClinic.id
+      // Set up the listener for Firebase Authentication state changes
+      const unsubscribeAuth = auth.onAuthStateChanged(async (firebaseUser) => {
+        setAuthLoading(true);
+        if (firebaseUser && firebaseUser.email) {
+          try {
+            const cleanEmail = firebaseUser.email.toLowerCase().trim();
+            // Retrieve authorized system user matching the email
+            const systemUser = await getDocument(COLLECTIONS.USERS, cleanEmail) as SystemUser | null;
+            
+            if (systemUser) {
+              if (systemUser.status === 'Ativo') {
+                setCurrentUser(systemUser);
+                setCurrentRole(systemUser.role);
+                
+                // Fetch the default associated clinic for this user
+                const clinicDoc = await getDocument(COLLECTIONS.CLINICS, systemUser.clinicId);
+                if (clinicDoc) {
+                  setCurrentClinic(clinicDoc as Clinic);
+                }
+              } else {
+                console.warn('Access denied: System user status is Inactive.');
+                await signOut(auth);
+                setCurrentUser(null);
+              }
+            } else {
+              console.warn('Authorized system user record not found in Firestore.');
+              await signOut(auth);
+              setCurrentUser(null);
+            }
+          } catch (err) {
+            console.error('Error during session validation:', err);
+            setCurrentUser(null);
+          }
+        } else {
+          setCurrentUser(null);
+          setCurrentClinic(null);
+        }
+        setAuthLoading(false);
+      });
+
+      return unsubscribeAuth;
     };
-    setEvents(prev => [...prev, newEvent]);
-  };
 
-  const handleUpdateEventStatus = (id: string, status: TherapeuticEvent['status']) => {
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, status } : e));
-    
-    // Automatically cancel all pendings if canceled
-    if (status === 'Cancelado') {
-      setRegistrations(prev => prev.map(r => r.eventId === id ? { ...r, status: 'Cancelado' } : r));
+      let unsubAuthPromise = initializeAppSession();
+ 
+       return () => {
+         unsubAuthPromise.then(unsub => unsub && unsub());
+       };
+     }, []);
+ 
+     // 1.5. GLOBAL CLINICS LIST SYNCHRONIZATION FOR REGISTRATION/LOGIN
+     useEffect(() => {
+       const unsubClinicsGlobal = subscribeCollection<Clinic>(COLLECTIONS.CLINICS, null, setClinics);
+       return () => {
+         unsubClinicsGlobal();
+       };
+     }, []);
+ 
+     // 2. REAL-TIME MULTI-TENANT DATABASE SYNCHRONIZATION (TENANT ISOLATION)
+     useEffect(() => {
+       if (!currentUser || !currentClinic) return;
+ 
+       const clinicId = currentClinic.id;
+       const role = currentUser.role;
+ 
+       // Subscriptions separated logically by subscriber/tenant (clinicId)
+       // Developers have universal reading capabilities to audit the SaaS
+       const unsubUsers = subscribeCollection<SystemUser>(COLLECTIONS.USERS, clinicId, setSystemUsers, role);
+       const unsubEvents = subscribeCollection<TherapeuticEvent>(COLLECTIONS.EVENTS, clinicId, setEvents, role);
+       const unsubPatients = subscribeCollection<Patient>(COLLECTIONS.PATIENTS, clinicId, setPatients, role);
+       const unsubRegistrations = subscribeCollection<Registration>(COLLECTIONS.REGISTRATIONS, clinicId, setRegistrations, role);
+       const unsubAssessments = subscribeCollection<EvolutionaryAssessment>(COLLECTIONS.ASSESSMENTS, clinicId, setAssessments, role);
+       const unsubMedicalRecords = subscribeCollection<MedicalRecord>(COLLECTIONS.MEDICAL_RECORDS, clinicId, setMedicalRecords, role);
+       const unsubAppointments = subscribeCollection<Appointment>(COLLECTIONS.APPOINTMENTS, clinicId, setAppointments, role);
+       const unsubTransactions = subscribeCollection<FinancialTransaction>(COLLECTIONS.TRANSACTIONS, clinicId, setTransactions, role);
+       const unsubAttendances = subscribeCollection<Attendance>(COLLECTIONS.ATTENDANCES, clinicId, setAttendances, role);
+ 
+       return () => {
+         unsubUsers();
+         unsubEvents();
+         unsubPatients();
+         unsubRegistrations();
+         unsubAssessments();
+         unsubMedicalRecords();
+         unsubAppointments();
+         unsubTransactions();
+         unsubAttendances();
+       };
+     }, [currentUser, currentClinic?.id]);
+
+  // Sync role to currentUser role changes
+  useEffect(() => {
+    if (currentUser) {
+      setCurrentRole(currentUser.role);
     }
-  };
+  }, [currentUser]);
 
-  const handleDeleteEvent = (id: string) => {
-    setEvents(prev => prev.filter(e => e.id !== id));
-  };
-
-  const handleToggleAttendance = (eventId: string, patientId: string, present: boolean) => {
-    setAttendances(prev => {
-      const exists = prev.some(a => a.eventId === eventId && a.patientId === patientId);
-      if (exists) {
-        return prev.map(a => (a.eventId === eventId && a.patientId === patientId) ? { ...a, present } : a);
-      } else {
-        return [...prev, { id: `att-${Date.now()}`, eventId, patientId, present, notes: '' }];
+  // Sync currentClinic state to its updated values from Firestore
+  useEffect(() => {
+    if (currentClinic && clinics.length > 0) {
+      const updated = clinics.find(c => c.id === currentClinic.id);
+      if (updated) {
+        setCurrentClinic(updated);
       }
-    });
-  };
+    }
+  }, [clinics, currentClinic?.id]);
 
-  const handleUpdateAttendanceNotes = (eventId: string, patientId: string, notes: string) => {
-    setAttendances(prev => {
-      const exists = prev.some(a => a.eventId === eventId && a.patientId === patientId);
-      if (exists) {
-        return prev.map(a => (a.eventId === eventId && a.patientId === patientId) ? { ...a, notes } : a);
-      } else {
-        return [...prev, { id: `att-${Date.now()}`, eventId, patientId, present: true, notes }];
-      }
-    });
+  const handleLogout = async () => {
+    await signOut(auth);
+    setCurrentUser(null);
+    setCurrentClinic(null);
+    setActiveTab('dashboard');
   };
 
   const handleOpenPublicFormByEvent = (eventId: string) => {
     setPublicEventId(eventId);
   };
 
+  // 1. EVENT MANAGEMENT CALLBACKS
+  const handleAddEvent = async (eventData: Omit<TherapeuticEvent, 'id' | 'clinicId'>) => {
+    if (!currentClinic) return;
+    const id = `event-${Date.now()}`;
+    const newEvent: TherapeuticEvent = {
+      ...eventData,
+      id,
+      clinicId: currentClinic.id
+    };
+    await saveDocument(COLLECTIONS.EVENTS, id, newEvent);
+  };
+
+  const handleUpdateEventStatus = async (id: string, status: TherapeuticEvent['status']) => {
+    await saveDocument(COLLECTIONS.EVENTS, id, { status });
+    if (status === 'Cancelado') {
+      const eventRegs = registrations.filter(r => r.eventId === id);
+      for (const reg of eventRegs) {
+        await saveDocument(COLLECTIONS.REGISTRATIONS, reg.id, { status: 'Cancelado' });
+      }
+    }
+  };
+
+  const handleDeleteEvent = async (id: string) => {
+    await removeDocument(COLLECTIONS.EVENTS, id);
+  };
+
+  const handleToggleAttendance = async (eventId: string, patientId: string, present: boolean) => {
+    const existing = attendances.find(a => a.eventId === eventId && a.patientId === patientId);
+    const id = existing ? existing.id : `att-${Date.now()}`;
+    await saveDocument(COLLECTIONS.ATTENDANCES, id, {
+      id,
+      eventId,
+      patientId,
+      present,
+      notes: existing ? existing.notes : ''
+    });
+  };
+
+  const handleUpdateAttendanceNotes = async (eventId: string, patientId: string, notes: string) => {
+    const existing = attendances.find(a => a.eventId === eventId && a.patientId === patientId);
+    const id = existing ? existing.id : `att-${Date.now()}`;
+    await saveDocument(COLLECTIONS.ATTENDANCES, id, {
+      id,
+      eventId,
+      patientId,
+      present: existing ? existing.present : true,
+      notes
+    });
+  };
+
   // 2. PATIENT CRM CALLBACKS
-  const handleAddPatient = (patientData: Omit<Patient, 'id' | 'clinicId' | 'photo' | 'createdAt'>) => {
+  const handleAddPatient = async (patientData: Omit<Patient, 'id' | 'clinicId' | 'photo' | 'createdAt'>) => {
+    if (!currentClinic) return;
+    const id = `patient-${Date.now()}`;
     const newPatient: Patient = {
       ...patientData,
-      id: `patient-${Date.now()}`,
+      id,
       clinicId: currentClinic.id,
-      photo: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=200', // cute default child avatar
+      photo: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=200',
       createdAt: new Date().toISOString()
     };
-    setPatients(prev => [...prev, newPatient]);
-    setSelectedPatientId(newPatient.id);
+    await saveDocument(COLLECTIONS.PATIENTS, id, newPatient);
+    setSelectedPatientId(id);
   };
 
-  const handleUpdatePatient = (id: string, patch: Partial<Patient>) => {
-    setPatients(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
+  const handleUpdatePatient = async (id: string, patch: Partial<Patient>) => {
+    await saveDocument(COLLECTIONS.PATIENTS, id, patch);
   };
 
-  const handleAddAssessment = (patientId: string, assData: Omit<EvolutionaryAssessment, 'id' | 'patientId' | 'date' | 'author'>) => {
+  const handleAddAssessment = async (patientId: string, assData: Omit<EvolutionaryAssessment, 'id' | 'patientId' | 'date' | 'author'>) => {
+    const id = `eval-${Date.now()}`;
     const newAss: EvolutionaryAssessment = {
       ...assData,
-      id: `eval-${Date.now()}`,
+      id,
       patientId,
       date: new Date().toISOString().split('T')[0],
-      author: currentRole === 'Admin' ? 'Dra. Ana Flávia' : currentRole === 'Fisio' ? 'Dra. Gabriela Nunes' : 'Silvia Souza'
+      author: currentUser?.name || 'Profissional'
     };
-    setAssessments(prev => [...prev, newAss]);
+    await saveDocument(COLLECTIONS.ASSESSMENTS, id, newAss);
   };
 
-  const handleAddMedicalRecord = (patientId: string, recData: Omit<MedicalRecord, 'id' | 'patientId' | 'date' | 'author'>) => {
+  const handleAddMedicalRecord = async (patientId: string, recData: Omit<MedicalRecord, 'id' | 'patientId' | 'date' | 'author'>) => {
+    const id = `rec-${Date.now()}`;
     const newRecord: MedicalRecord = {
       ...recData,
-      id: `rec-${Date.now()}`,
+      id,
       patientId,
       date: new Date().toISOString().split('T')[0],
-      author: currentRole === 'Admin' ? 'Dra. Ana Flávia' : currentRole === 'Fisio' ? 'Dra. Gabriela Nunes' : 'Silvia Souza'
+      author: currentUser?.name || 'Profissional'
     };
-    setMedicalRecords(prev => [...prev, newRecord]);
+    await saveDocument(COLLECTIONS.MEDICAL_RECORDS, id, newRecord);
   };
 
-  // 3. APPOINTMENT SCHEDULING CALLBACKS (ScheduleCalendar)
-  const handleAddAppointment = (appData: Omit<Appointment, 'id' | 'clinicId' | 'patientName'>) => {
+  // 3. APPOINTMENT SCHEDULING CALLBACKS
+  const handleAddAppointment = async (appData: Omit<Appointment, 'id' | 'clinicId' | 'patientName'>) => {
+    if (!currentClinic) return;
     const child = patients.find(p => p.id === appData.patientId);
+    const id = `app-${Date.now()}`;
     const newApp: Appointment = {
       ...appData,
-      id: `app-${Date.now()}`,
+      id,
       clinicId: currentClinic.id,
       patientName: child ? child.name : 'Paciente Desconhecido'
     };
-    setAppointments(prev => [...prev, newApp]);
+    await saveDocument(COLLECTIONS.APPOINTMENTS, id, newApp);
 
-    // Automatically file a ledger receipt if appointment is already labeled completed
     if (newApp.status === 'Realizado') {
+      const txId = `tx-${Date.now()}`;
       const newTx: FinancialTransaction = {
-        id: `tx-${Date.now()}`,
+        id: txId,
         clinicId: currentClinic.id,
         type: 'Receita',
         category: 'Atendimento Particular',
         value: newApp.price,
         date: newApp.date,
         description: `Sessão ${newApp.type} - ${newApp.patientName}`,
-        referenceId: newApp.id
+        referenceId: id
       };
-      setTransactions(prev => [...prev, newTx]);
+      await saveDocument(COLLECTIONS.TRANSACTIONS, txId, newTx);
     }
   };
 
-  const handleUpdateAppointmentStatus = (id: string, status: Appointment['status']) => {
-    setAppointments(prev => prev.map(a => {
-      if (a.id === id) {
-        const oldStatus = a.status;
-        const updated = { ...a, status };
+  const handleUpdateAppointmentStatus = async (id: string, status: Appointment['status']) => {
+    const a = appointments.find(app => app.id === id);
+    if (!a) return;
+    const oldStatus = a.status;
 
-        // Automatically file a revenue transaction if changed to 'Realizado'
-        if (status === 'Realizado' && oldStatus !== 'Realizado') {
-          const txExists = transactions.some(t => t.referenceId === id);
-          if (!txExists) {
-            setTransactions(prevTx => [
-              ...prevTx,
-              {
-                id: `tx-${Date.now()}`,
-                clinicId: a.clinicId,
-                type: 'Receita',
-                category: 'Atendimento Particular',
-                value: a.price,
-                date: a.date,
-                description: `Sessão ${a.type} - ${a.patientName}`,
-                referenceId: id
-              }
-            ]);
-          }
-        }
-        return updated;
+    await saveDocument(COLLECTIONS.APPOINTMENTS, id, { status });
+
+    if (status === 'Realizado' && oldStatus !== 'Realizado') {
+      const txExists = transactions.some(t => t.referenceId === id);
+      if (!txExists) {
+        const txId = `tx-${Date.now()}`;
+        const newTx: FinancialTransaction = {
+          id: txId,
+          clinicId: a.clinicId,
+          type: 'Receita',
+          category: 'Atendimento Particular',
+          value: a.price,
+          date: a.date,
+          description: `Sessão ${a.type} - ${a.patientName}`,
+          referenceId: id
+        };
+        await saveDocument(COLLECTIONS.TRANSACTIONS, txId, newTx);
       }
-      return a;
-    }));
+    }
   };
 
-  const handleDeleteAppointment = (id: string) => {
-    setAppointments(prev => prev.filter(a => a.id !== id));
+  const handleDeleteAppointment = async (id: string) => {
+    await removeDocument(COLLECTIONS.APPOINTMENTS, id);
   };
 
   // 4. FINANCIAL LEDGER CALLBACKS
-  const handleAddTransaction = (txData: Omit<FinancialTransaction, 'id' | 'clinicId'>) => {
+  const handleAddTransaction = async (txData: Omit<FinancialTransaction, 'id' | 'clinicId'>) => {
+    if (!currentClinic) return;
+    const id = `tx-${Date.now()}`;
     const newTx: FinancialTransaction = {
       ...txData,
-      id: `tx-${Date.now()}`,
+      id,
       clinicId: currentClinic.id
     };
-    setTransactions(prev => [...prev, newTx]);
+    await saveDocument(COLLECTIONS.TRANSACTIONS, id, newTx);
   };
 
-  const handleDeleteTransaction = (id: string) => {
-    setTransactions(prev => prev.filter(t => t.id !== id));
+  const handleDeleteTransaction = async (id: string) => {
+    await removeDocument(COLLECTIONS.TRANSACTIONS, id);
   };
 
-  // 5. REGISTRATION AND BILLING CENTER - APROVAÇÃO FINANCEIRA DE PIX COBRADO
-  const handleApproveRegistration = (id: string) => {
-    setRegistrations(prevRegs => prevRegs.map(reg => {
-      if (reg.id === id) {
-        const updatedReg = { ...reg, status: 'Aprovado' as const };
-        
-        // Dynamic cash book entry injection
-        const matchedEvent = events.find(e => e.id === reg.eventId);
-        if (matchedEvent) {
-          const newTx: FinancialTransaction = {
-            id: `tx-${Date.now()}`,
-            clinicId: reg.clinicId,
-            type: 'Receita',
-            category: 'Inscrição de Evento',
-            value: matchedEvent.price,
-            date: new Date().toISOString().split('T')[0],
-            description: `Inscrição ${matchedEvent.name} - ${reg.childName} (${reg.registrationNumber})`,
-            referenceId: reg.id
-          };
-          setTransactions(prevTx => [...prevTx, newTx]);
-        }
-        return updatedReg;
-      }
-      return reg;
-    }));
+  // 5. REGISTRATION AND BILLING CENTER - APROVAÇÃO FINANCEIRA
+  const handleApproveRegistration = async (id: string) => {
+    const reg = registrations.find(r => r.id === id);
+    if (!reg) return;
+
+    await saveDocument(COLLECTIONS.REGISTRATIONS, id, { status: 'Aprovado' });
+
+    const matchedEvent = events.find(e => e.id === reg.eventId);
+    if (matchedEvent) {
+      const txId = `tx-${Date.now()}`;
+      const newTx: FinancialTransaction = {
+        id: txId,
+        clinicId: reg.clinicId,
+        type: 'Receita',
+        category: 'Inscrição de Evento',
+        value: matchedEvent.price,
+        date: new Date().toISOString().split('T')[0],
+        description: `Inscrição ${matchedEvent.name} - ${reg.childName} (${reg.registrationNumber})`,
+        referenceId: reg.id
+      };
+      await saveDocument(COLLECTIONS.TRANSACTIONS, txId, newTx);
+    }
   };
 
-  // 6. PUBLIC REGISTRATION HANDLER FROM DIVULGATION LINK LINKS
-  const handleAddRegistrationFromPublicForm = (
+  // 6. PUBLIC REGISTRATION HANDLER
+  const handleAddRegistrationFromPublicForm = async (
     patientInput: Omit<Patient, 'id' | 'clinicId' | 'photo' | 'createdAt'>,
     registrationInput: Omit<Registration, 'id' | 'clinicId' | 'registrationNumber' | 'date'>
   ) => {
-    // Audit clinic for selected event
     const matchedEvent = events.find(e => e.id === registrationInput.eventId);
-    const targetClinicId = matchedEvent ? matchedEvent.clinicId : currentClinic.id;
+    const targetClinicId = matchedEvent ? matchedEvent.clinicId : (currentClinic?.id || 'clinic-1');
 
-    // Duplication checker for child of this mother on same clinic
     let foundPatient = patients.find(p => 
       p.clinicId === targetClinicId && 
       p.name.trim().toLowerCase() === patientInput.name.trim().toLowerCase()
@@ -455,48 +490,46 @@ export default function App() {
     if (foundPatient) {
       childId = foundPatient.id;
     } else {
-      // Create Patient File
+      childId = `patient-${Date.now()}`;
       const newPatient: Patient = {
         ...patientInput,
-        id: `patient-${Date.now()}`,
+        id: childId,
         clinicId: targetClinicId,
         photo: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=200',
         createdAt: new Date().toISOString()
       };
-      setPatients(prev => [...prev, newPatient]);
-      childId = newPatient.id;
+      await saveDocument(COLLECTIONS.PATIENTS, childId, newPatient);
     }
 
+    const regId = `reg-${Date.now() + 1}`;
     const newReg: Registration = {
       ...registrationInput,
-      id: `reg-${Date.now() + 1}`,
+      id: regId,
       clinicId: targetClinicId,
       childId,
       registrationNumber: `INS-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       date: new Date().toISOString().split('T')[0]
     };
+    await saveDocument(COLLECTIONS.REGISTRATIONS, regId, newReg);
 
-    setRegistrations(prev => [...prev, newReg]);
-
-    // Automatically inject cash book/ledger receipts since registration is already approved on submission (payment attached)
     if (newReg.status === 'Aprovado' && matchedEvent) {
+      const txId = `tx-${Date.now() + 3}`;
       const newTx: FinancialTransaction = {
-        id: `tx-${Date.now() + 3}`,
+        id: txId,
         clinicId: targetClinicId,
         type: 'Receita',
         category: 'Inscrição de Evento',
         value: matchedEvent.price,
         date: new Date().toISOString().split('T')[0],
         description: `Inscrição ${matchedEvent.name} - ${newReg.childName} (${newReg.registrationNumber})`,
-        referenceId: newReg.id
+        referenceId: regId
       };
-      setTransactions(prevTx => [...prevTx, newTx]);
+      await saveDocument(COLLECTIONS.TRANSACTIONS, txId, newTx);
     }
 
-    // Automatically register future therapy plan booking in Agenda workspace
-    // as an Agendado assessment, to link CRM records together
+    const appId = `app-${Date.now() + 2}`;
     const newAppointment: Appointment = {
-      id: `app-${Date.now() + 2}`,
+      id: appId,
       clinicId: targetClinicId,
       patientId: childId,
       patientName: patientInput.name,
@@ -506,44 +539,78 @@ export default function App() {
       price: matchedEvent ? matchedEvent.price : 150.0,
       status: 'Agendado'
     };
-    setAppointments(prev => [...prev, newAppointment]);
+    await saveDocument(COLLECTIONS.APPOINTMENTS, appId, newAppointment);
   };
 
-  // 7. MULTI-CLINIC MANAGEMENT
-  const handleAddClinic = (clinicData: Omit<Clinic, 'id'>) => {
+  // 7. MULTI-CLINIC MANAGEMENT (SaaS Operator Panel)
+  const handleAddClinic = async (clinicData: Omit<Clinic, 'id'>) => {
+    const id = `clinic-${Date.now()}`;
     const newClinic: Clinic = {
       ...clinicData,
-      id: `clinic-${Date.now()}`,
+      id,
       status: 'Ativo'
     };
-    setClinics(prev => [...prev, newClinic]);
+    await saveDocument(COLLECTIONS.CLINICS, id, newClinic);
     setCurrentClinic(newClinic);
   };
 
-  const handleUpdateClinicPlan = (id: string, plan: Clinic['plan']) => {
-    setClinics(prev => prev.map(c => c.id === id ? { ...c, plan } : c));
+  const handleUpdateClinicPlan = async (id: string, plan: Clinic['plan']) => {
+    await saveDocument(COLLECTIONS.CLINICS, id, { plan });
   };
 
-  const handleUpdateClinicDetails = (id: string, patch: Partial<Clinic>) => {
-    setClinics(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c));
+  const handleUpdateClinicDetails = async (id: string, patch: Partial<Clinic>) => {
+    await saveDocument(COLLECTIONS.CLINICS, id, patch);
   };
 
-  const handleAddSystemUser = (userData: Omit<SystemUser, 'id' | 'createdAt'>) => {
+  const handleAddSystemUser = async (userData: Omit<SystemUser, 'id' | 'createdAt'>) => {
+    const emailId = userData.email.toLowerCase().trim();
     const newUser: SystemUser = {
       ...userData,
-      id: `user-${Date.now()}`,
+      id: emailId,
       createdAt: new Date().toISOString().split('T')[0]
     };
-    setSystemUsers(prev => [...prev, newUser]);
+    await saveDocument(COLLECTIONS.USERS, emailId, newUser);
+
+    // Multi-tenant email registration confirmation trick:
+    // Create their auth record in background using a separate Firebase app instance,
+    // so it doesn't log out the currently active Administrator session.
+    // This allows immediately shooting password recovery and registration emails!
+    try {
+      const { initializeApp } = await import('firebase/app');
+      const { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } = await import('firebase/auth');
+      const firebaseConfig = await import('../firebase-applet-config.json');
+
+      const tempApp = initializeApp(firebaseConfig.default, `temp-${Date.now()}`);
+      const tempAuth = getAuth(tempApp);
+
+      const userCred = await createUserWithEmailAndPassword(tempAuth, userData.email, userData.password || '1234');
+      await sendEmailVerification(userCred.user);
+      await sendPasswordResetEmail(tempAuth, userData.email);
+      await tempAuth.signOut();
+      console.log(`Successfully dispatched confirmation/recovery email to ${userData.email}`);
+    } catch (e) {
+      console.warn("Auth user pre-registration skipped (might already exist or network offline):", e);
+    }
   };
 
-  const handleUpdateSystemUser = (id: string, patch: Partial<SystemUser>) => {
-    setSystemUsers(prev => prev.map(u => u.id === id ? { ...u, ...patch } : u));
+  const handleUpdateSystemUser = async (id: string, patch: Partial<SystemUser>) => {
+    await saveDocument(COLLECTIONS.USERS, id, patch);
   };
 
-  const handleDeleteSystemUser = (id: string) => {
-    setSystemUsers(prev => prev.filter(u => u.id !== id));
+  const handleDeleteSystemUser = async (id: string) => {
+    await removeDocument(COLLECTIONS.USERS, id);
   };
+
+  // Render loading spinner when resolving Firebase session
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAF9F5] text-slate-800 dark:bg-[#121614] dark:text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#9BB0A5] mb-4"></div>
+        <p className="font-serif italic text-lg font-semibold">Carregando CSM Clinical...</p>
+        <p className="text-xs text-slate-400 mt-1">Conectando ao banco de dados Firebase seguro</p>
+      </div>
+    );
+  }
 
   // Routing render
   if (publicEventId) {
@@ -553,7 +620,6 @@ export default function App() {
         selectedEventId={publicEventId}
         onBackToCRM={() => {
           setPublicEventId(null);
-          // Remove query params
           window.history.pushState({}, document.title, window.location.pathname);
         }}
         onAddRegistration={handleAddRegistrationFromPublicForm}
@@ -562,30 +628,183 @@ export default function App() {
     );
   }
 
-  if (!currentUser) {
+  if (!currentUser || !currentClinic) {
     return (
       <Login 
         systemUsers={systemUsers}
-        onLoginSuccess={(user) => {
-          setCurrentUser(user);
-          setCurrentRole(user.role);
-        }}
-        onRegisterUser={(userPayload) => {
-          const newUser: SystemUser = {
-            ...userPayload,
-            id: `user-${Date.now()}`,
-            createdAt: new Date().toISOString().split('T')[0],
-            status: 'Ativo'
-          };
-          setSystemUsers(prev => [...prev, newUser]);
-          localStorage.setItem('csm_session_user', JSON.stringify(newUser));
-          setCurrentUser(newUser);
-          setCurrentRole(newUser.role);
-        }}
+        onLoginSuccess={() => {}} // Driven by auth state listener
+        onRegisterUser={() => {}} // Driven by auth state listener
         darkMode={darkMode}
         setDarkMode={setDarkMode}
         clinics={clinics}
       />
+    );
+  }
+
+  if (currentUser && currentUser.password === '1234') {
+    const isMinLength = newPasswordInput.length >= 8;
+    const hasLetterAndNumber = /[a-zA-Z]/.test(newPasswordInput) && /[0-9]/.test(newPasswordInput);
+    const hasUppercase = /[A-Z]/.test(newPasswordInput);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>_/\-+=~`[\]\\]/.test(newPasswordInput);
+    const passwordsMatch = confirmPasswordInput !== '' && newPasswordInput === confirmPasswordInput;
+
+    const reqs = [
+      { label: 'No mínimo 8 caracteres', met: isMinLength },
+      { label: 'Conter letras e números', met: hasLetterAndNumber },
+      { label: 'No mínimo uma letra maiúscula', met: hasUppercase },
+      { label: 'No mínimo um caractere especial (ex: @, #, $, %)', met: hasSpecialChar },
+      { label: 'Confirmação de senha idêntica', met: passwordsMatch },
+    ];
+
+    return (
+      <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${darkMode ? 'dark bg-[#1B221E] text-[#ECEBE5]' : 'bg-[#F9F8F3] text-[#2D312E]'}`}>
+        <div className={`w-full max-w-md p-8 rounded-3xl shadow-2xl border transition-all duration-300 ${darkMode ? 'bg-[#232B26] border-[#303B34]' : 'bg-white border-slate-200'}`}>
+          <div className="flex flex-col items-center mb-6 text-center">
+            <div className={`p-4 rounded-full mb-4 ${darkMode ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+              <Lock className="w-10 h-10 animate-pulse" />
+            </div>
+            <h2 className="text-2xl font-black tracking-tight">Alteração de Senha Obrigatória</h2>
+            <p className="text-xs text-slate-400 mt-2 max-w-xs">
+              Sua conta está utilizando a senha padrão de primeiro acesso (<strong className="font-mono">1234</strong>). Por segurança, cadastre uma nova senha forte para continuar.
+            </p>
+          </div>
+
+          <form onSubmit={handlePasswordChangeSubmit} className="space-y-4">
+            {passwordChangeError && (
+              <div className="p-3.5 text-xs font-semibold bg-rose-500/10 text-rose-500 rounded-xl border border-rose-500/20 flex items-center gap-2">
+                <XCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{passwordChangeError}</span>
+              </div>
+            )}
+
+            {passwordChangeSuccess && (
+              <div className="p-3.5 text-xs font-semibold bg-emerald-500/10 text-emerald-500 rounded-xl border border-emerald-500/20 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0 animate-pulse" />
+                <span>{passwordChangeSuccess}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 opacity-80">
+                Senha Atual
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  value={currentPasswordInput}
+                  onChange={(e) => setCurrentPasswordInput(e.target.value)}
+                  placeholder="Digite '1234'"
+                  className={`w-full text-sm pl-10 pr-4 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
+                    darkMode 
+                      ? 'bg-[#1B221E] border-[#303B34] focus:ring-[#9BB0A5]/40 text-white' 
+                      : 'bg-slate-50 border-slate-200 focus:ring-[#9BB0A5]/20 text-slate-800'
+                  }`}
+                  required
+                />
+                <KeyRound className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 opacity-80">
+                Nova Senha
+              </label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  placeholder="Cadastre sua nova senha"
+                  className={`w-full text-sm pl-10 pr-10 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
+                    darkMode 
+                      ? 'bg-[#1B221E] border-[#303B34] focus:ring-[#9BB0A5]/40 text-white' 
+                      : 'bg-slate-50 border-slate-200 focus:ring-[#9BB0A5]/20 text-slate-800'
+                  }`}
+                  required
+                />
+                <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 hover:scale-115 transition-all"
+                >
+                  {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider mb-1.5 opacity-80">
+                Confirmar Nova Senha
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPasswordInput}
+                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                  placeholder="Confirme sua nova senha"
+                  className={`w-full text-sm pl-10 pr-10 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all ${
+                    darkMode 
+                      ? 'bg-[#1B221E] border-[#303B34] focus:ring-[#9BB0A5]/40 text-white' 
+                      : 'bg-slate-50 border-slate-200 focus:ring-[#9BB0A5]/20 text-slate-800'
+                  }`}
+                  required
+                />
+                <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 hover:scale-115 transition-all"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Live Requirements List */}
+            <div className={`p-4 rounded-xl space-y-2 border text-xs transition-all duration-300 ${darkMode ? 'bg-[#1B221E]/50 border-[#303B34]' : 'bg-slate-50 border-slate-100'}`}>
+              <span className="block font-bold mb-2 opacity-90 text-[10px] uppercase tracking-wider">Requisitos da senha:</span>
+              {reqs.map((req, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  {req.met ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 animate-[pulse_1s_infinite]" />
+                  ) : (
+                    <div className="w-4 h-4 rounded-full border-2 border-slate-300 flex-shrink-0 transition-colors" />
+                  )}
+                  <span className={`transition-colors duration-200 ${req.met ? 'text-emerald-500 font-semibold' : 'text-slate-400'}`}>
+                    {req.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
+                  darkMode 
+                    ? 'border-[#303B34] hover:bg-slate-800/50 text-[#ECEBE5]' 
+                    : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                }`}
+              >
+                <LogOut className="w-4 h-4" /> Sair
+              </button>
+              <button
+                type="submit"
+                disabled={isChangingPassword || !isMinLength || !hasLetterAndNumber || !hasUppercase || !hasSpecialChar || !passwordsMatch}
+                className={`flex-[2] py-2.5 px-4 rounded-xl text-xs font-bold text-white transition-all shadow-md focus:outline-none focus:ring-2 ${
+                  isChangingPassword || !isMinLength || !hasLetterAndNumber || !hasUppercase || !hasSpecialChar || !passwordsMatch
+                    ? 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed shadow-none'
+                    : 'bg-[#9BB0A5] hover:bg-[#8A9F94] focus:ring-[#9BB0A5]/40 hover:shadow-lg hover:-translate-y-0.5'
+                }`}
+              >
+                {isChangingPassword ? 'Salvando...' : 'Salvar Nova Senha'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     );
   }
 
@@ -607,6 +826,9 @@ export default function App() {
         setSidebarOpen={setSidebarOpen}
         currentUser={currentUser}
         onLogout={handleLogout}
+        registrations={registrations}
+        appointments={appointments}
+        events={events}
       />
 
       {/* Floating Menu Toggle Button when options bar is hidden */}
@@ -650,14 +872,14 @@ export default function App() {
             medicalRecords={medicalRecords}
             events={events}
             registrations={registrations}
-            attendances={attendances}
+            darkMode={darkMode}
             onAddPatient={handleAddPatient}
             onUpdatePatient={handleUpdatePatient}
             onAddAssessment={handleAddAssessment}
             onAddMedicalRecord={handleAddMedicalRecord}
             selectedPatientId={selectedPatientId}
             setSelectedPatientId={setSelectedPatientId}
-            darkMode={darkMode}
+            attendances={attendances}
           />
         )}
 
@@ -726,6 +948,16 @@ export default function App() {
             onUpdateSystemUser={handleUpdateSystemUser}
             onDeleteSystemUser={handleDeleteSystemUser}
             setCurrentClinic={setCurrentClinic}
+            darkMode={darkMode}
+            currentUser={currentUser}
+            currentRole={currentRole}
+          />
+        )}
+
+        {activeTab === 'comunicacao' && (
+          <CommunicationSettings
+            currentClinic={currentClinic}
+            onUpdateClinicDetails={handleUpdateClinicDetails}
             darkMode={darkMode}
           />
         )}

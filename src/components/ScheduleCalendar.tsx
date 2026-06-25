@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar as CalendarIcon, 
   Clock, 
@@ -47,7 +47,11 @@ export default function ScheduleCalendar({
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedAppointmentForReminder, setSelectedAppointmentForReminder] = useState<Appointment | null>(null);
   const [showReminderSentAlert, setShowReminderSentAlert] = useState(false);
-  const [waLinked, setWaLinked] = useState<string | null>(() => localStorage.getItem('csm_whatsapp_linked'));
+  const [waLinked, setWaLinked] = useState<string | null>(() => localStorage.getItem('csm_whatsapp_linked') || currentClinic.whatsapp || null);
+
+  useEffect(() => {
+    setWaLinked(currentClinic.whatsapp || localStorage.getItem('csm_whatsapp_linked') || null);
+  }, [currentClinic.whatsapp]);
 
   // Form states: New Appointment
   const [patId, setPatId] = useState('');
@@ -113,8 +117,8 @@ export default function ScheduleCalendar({
   };
 
   const handleSendReminderSimulation = (app: Appointment) => {
-    // Refresh connection state from localStorage
-    const currentWa = localStorage.getItem('csm_whatsapp_linked');
+    // Refresh connection state from localStorage and currentClinic
+    const currentWa = currentClinic.whatsapp || localStorage.getItem('csm_whatsapp_linked');
     setWaLinked(currentWa);
     setSelectedAppointmentForReminder(app);
     setShowReminderSentAlert(true);

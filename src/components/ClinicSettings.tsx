@@ -17,7 +17,8 @@ import {
   Trash2,
   Shield,
   Briefcase,
-  AlertCircle
+  AlertCircle,
+  Lock
 } from 'lucide-react';
 import { Clinic, SystemUser, UserRole } from '../types';
 
@@ -33,6 +34,8 @@ interface ClinicSettingsProps {
   onDeleteSystemUser: (id: string) => void;
   setCurrentClinic: (clinic: Clinic) => void;
   darkMode: boolean;
+  currentUser?: SystemUser | null;
+  currentRole?: UserRole;
 }
 
 export default function ClinicSettings({
@@ -46,7 +49,9 @@ export default function ClinicSettings({
   onUpdateSystemUser,
   onDeleteSystemUser,
   setCurrentClinic,
-  darkMode
+  darkMode,
+  currentUser,
+  currentRole = 'Admin'
 }: ClinicSettingsProps) {
 
   const [showAddClinicModal, setShowAddClinicModal] = useState(false);
@@ -75,19 +80,14 @@ export default function ClinicSettings({
   const [newUserPassword, setNewUserPassword] = useState('1234');
   const [userSuccess, setUserSuccess] = useState(false);
 
-  // WhatsApp State Management
-  const [whatsappNumber, setWhatsappNumber] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('csm_whatsapp_linked') || '';
-    }
-    return '';
-  });
-  const [isWhatsappConnected, setIsWhatsappConnected] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return !!localStorage.getItem('csm_whatsapp_linked');
-    }
-    return false;
-  });
+  // Developer/Manager: User account inline editing states
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [userEditName, setUserEditName] = useState('');
+  const [userEditEmail, setUserEditEmail] = useState('');
+  const [userEditRole, setUserEditRole] = useState<UserRole>('Fisio');
+  const [userEditPassword, setUserEditPassword] = useState('');
+  const [userEditClinicId, setUserEditClinicId] = useState('');
+  const [selectedUserClinicFilter, setSelectedUserClinicFilter] = useState<string>('all');
 
   // Sync edit inputs when active clinic changes
   useEffect(() => {
@@ -169,8 +169,11 @@ export default function ClinicSettings({
     alert(`Sucesso! Sua clínica ${currentClinic.name} foi atualizada para o plano ${plan}. As novas cobranças de fatura já estão programadas.`);
   };
 
-  // Filter users belonging only to active clinic
-  const activeClinicUsers = systemUsers.filter(u => u.clinicId === currentClinic.id);
+  // Filter users belonging only to active clinic, with all clinics support for Developers
+  const isDev = currentRole === 'Desenvolvedor';
+  const activeClinicUsers = isDev
+    ? (selectedUserClinicFilter === 'all' ? systemUsers : systemUsers.filter(u => u.clinicId === selectedUserClinicFilter))
+    : systemUsers.filter(u => u.clinicId === currentClinic.id);
 
   return (
     <div id="clinic-settings-module" className="space-y-8 pb-16">
@@ -404,112 +407,6 @@ export default function ClinicSettings({
             </form>
           </div>
 
-          {/* WHATSAPP CONNECTOR */}
-          <div className={`p-6 border rounded-[2rem] shadow-sm space-y-4 ${
-            darkMode ? 'bg-[#242D28] border-[#2E3832] text-[#ECEBE5]' : 'bg-white border-[#E5E3DB] text-[#2D312E]'
-          }`}>
-            <div>
-              <span className="text-[9px] uppercase tracking-wider font-extrabold px-2.5 py-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-full">
-                💬 Integração WhatsApp
-              </span>
-              <h3 className="text-sm font-extrabold uppercase tracking-widest text-[#8A9F94] mt-2 mb-1">
-                Disparos Clínicos para Familiares
-              </h3>
-              <p className="text-xs text-slate-450">
-                Ligue um número de celular oficial para disparar os trabalhos de casa, lembretes de agenda e confirmações de presença dos pacientes.
-              </p>
-            </div>
-
-            {isWhatsappConnected ? (
-              <div className="space-y-4 animate-in fade-in duration-200">
-                <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                    <div>
-                      <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">Canal Conectado e Operante</p>
-                      <p className="text-[11px] font-mono font-bold text-slate-500">Responsável: {whatsappNumber}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem('csm_whatsapp_linked');
-                      setIsWhatsappConnected(false);
-                      setWhatsappNumber('');
-                    }}
-                    className="px-3 py-1.5 text-[10px] font-bold rounded-xl bg-rose-500 hover:bg-rose-600 text-white transition-all cursor-pointer"
-                  >
-                    Desconectar
-                  </button>
-                </div>
-
-                <div className="space-y-1.5 pt-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Modelo do Texto de Confirmação</label>
-                  <textarea
-                    rows={3}
-                    defaultValue="Olá [Responsável]! 🎈 Passando para lembrar que a sessão de terapia de [Paciente] está marcada para [Data] às [Hora] na clínica [Clínica]. Contamos com vocês!"
-                    className={`w-full text-xs font-semibold rounded-xl px-4 py-3 outline-none border transition-all ${
-                      darkMode ? 'bg-slate-800 border-slate-705 text-slate-200' : 'bg-slate-50 border-[#E5E3DB] text-slate-800'
-                    }`}
-                  />
-                  <span className="text-[9px] text-slate-400 italic block">Use [Responsável], [Paciente], [Data], [Hora] e [Clínica] como tags dinâmicas.</span>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4 animate-in fade-in duration-200">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Insira o Celular com DDD (WhatsApp)</label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 text-xs font-bold font-mono">
-                      🇧🇷 +55
-                    </span>
-                    <input
-                      type="text"
-                      value={whatsappNumber}
-                      onChange={(e) => setWhatsappNumber(e.target.value)}
-                      placeholder="(11) 98311-2244"
-                      className={`w-full text-xs font-bold rounded-xl pl-14 pr-4 py-3 outline-none border transition-all ${
-                        darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-[#F9F8F3] border-[#E5E3DB] text-slate-800'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {whatsappNumber ? (
-                  <div className="p-4 border rounded-2xl border-[#E5E3DB] dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col items-center justify-center text-center gap-3 animate-in fade-in duration-300">
-                    <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center relative">
-                      <div className="w-36 h-36 relative flex items-center justify-center bg-white rounded-xl overflow-hidden">
-                        <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://wa.me/55${whatsappNumber.replace(/\D/g, '') || '00000000000'}`}
-                          alt="QR Code de Conexão WhatsApp"
-                          className="w-32 h-32 object-contain"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute left-0 right-0 h-0.5 bg-emerald-500 animate-[bounce_2.5s_infinite] shadow-md opacity-80 pointer-events-none"></div>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[11px] font-bold text-slate-600 dark:text-slate-350">Aponte a câmera do WhatsApp para ler o código acima</p>
-                      <p className="text-[10px] text-slate-400">Vincula o DDD + Número e sincroniza o celular ao CRM.</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        localStorage.setItem('csm_whatsapp_linked', whatsappNumber);
-                        setIsWhatsappConnected(true);
-                      }}
-                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 w-full"
-                    >
-                      ✓ Confirmar Leitura de Código (Parear)
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-center text-[10px] text-slate-400 font-semibold italic">
-                    Digite o número de telefone acima para exibir o QR Code de Vinculação.
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
         </div>
 
       </div>
@@ -632,17 +529,38 @@ export default function ClinicSettings({
 
           {/* List/Table of Active Users in selected clinic (Col 5 to 12) */}
           <div className="lg:col-span-8 space-y-4">
-            <h4 className="text-xs uppercase tracking-widest font-bold opacity-50 mb-2">Profissionais e Níveis de Acesso Ativos</h4>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <h4 className="text-xs uppercase tracking-widest font-bold opacity-50">Profissionais e Níveis de Acesso</h4>
+              
+              {isDev && (
+                <div className="flex items-center gap-2 bg-emerald-500/5 border border-emerald-500/10 px-3 py-1.5 rounded-xl">
+                  <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">Filtrar Unidade:</span>
+                  <select
+                    value={selectedUserClinicFilter}
+                    onChange={(e) => setSelectedUserClinicFilter(e.target.value)}
+                    className={`text-[11px] font-bold rounded-lg px-2 py-1 outline-none border transition-all ${
+                      darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-850'
+                    }`}
+                  >
+                    <option value="all">Todas as Clínicas (Geral)</option>
+                    {clinics.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
             
             <div className="overflow-x-auto rounded-3xl border border-[#E5E3DB] dark:border-[#2E3832]">
-              <table className="w-full text-left text-xs min-w-[500px]">
+              <table className="w-full text-left text-xs min-w-[650px]">
                 <thead>
                   <tr className={`border-b border-[#E5E3DB] dark:border-[#2E3832] ${
                     darkMode ? 'bg-slate-900/50' : 'bg-[#F9F8F3]'
                   }`}>
                     <th scope="col" className="p-4 font-bold uppercase tracking-wider text-[10px] text-slate-400">Nome/Email</th>
-                    <th scope="col" className="p-4 font-bold uppercase tracking-wider text-[10px] text-slate-400">Senha</th>
+                    <th scope="col" className="p-4 font-bold uppercase tracking-wider text-[10px] text-slate-400">Unidade</th>
                     <th scope="col" className="p-4 font-bold uppercase tracking-wider text-[10px] text-slate-400">Nível de Acesso</th>
+                    <th scope="col" className="p-4 font-bold uppercase tracking-wider text-[10px] text-slate-400">Senha</th>
                     <th scope="col" className="p-4 font-bold uppercase tracking-wider text-[10px] text-slate-400">Status</th>
                     <th scope="col" className="p-4 font-bold uppercase tracking-wider text-[10px] text-slate-400 text-right">Ações</th>
                   </tr>
@@ -650,47 +568,125 @@ export default function ClinicSettings({
                 <tbody className="divide-y divide-[#E5E3DB] dark:divide-[#2E3832]">
                   {activeClinicUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-slate-400 italic">No users found for this clinic workspace. Please add one!</td>
+                      <td colSpan={6} className="p-8 text-center text-slate-400 italic">Nenhum profissional encontrado nesta seleção. Cadastre um novo ao lado!</td>
                     </tr>
                   ) : (
                     activeClinicUsers.map((user) => {
+                      const isEditingThisUser = editingUserId === user.id;
+                      const userClinic = clinics.find(c => c.id === user.clinicId);
+
                       return (
                         <tr key={user.id} className="hover:bg-slate-50/50 dark:hover:bg-[#2E3832]/30 transition-all">
                           
                           {/* Name & Email detail */}
                           <td className="p-4">
-                            <div>
-                              <p className="font-bold text-slate-800 dark:text-white">{user.name}</p>
-                              <p className="text-[10px] text-slate-400">{user.email}</p>
-                            </div>
+                            {isEditingThisUser ? (
+                              <div className="space-y-1 max-w-[180px]">
+                                <input
+                                  type="text"
+                                  value={userEditName}
+                                  onChange={(e) => setUserEditName(e.target.value)}
+                                  className={`w-full text-xs font-bold rounded-lg px-2.5 py-1 border outline-none ${
+                                    darkMode ? 'bg-slate-800 border-slate-700 text-white focus:border-emerald-500' : 'bg-white border-slate-200 text-slate-800 focus:border-emerald-400'
+                                  }`}
+                                />
+                                <input
+                                  type="email"
+                                  value={userEditEmail}
+                                  onChange={(e) => setUserEditEmail(e.target.value)}
+                                  className={`w-full text-[10px] font-semibold rounded-lg px-2.5 py-1 border outline-none ${
+                                    darkMode ? 'bg-slate-800 border-slate-700 text-slate-400 focus:border-emerald-500' : 'bg-white border-slate-200 text-slate-500 focus:border-emerald-400'
+                                  }`}
+                                />
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                                  {user.name}
+                                  {user.role === 'Desenvolvedor' && (
+                                    <span className="text-[8px] bg-sky-500/10 text-sky-600 dark:text-sky-400 px-1.5 py-0.5 rounded-md font-black">DEV</span>
+                                  )}
+                                </p>
+                                <p className="text-[10px] text-slate-400">{user.email}</p>
+                              </div>
+                            )}
                           </td>
 
-                          {/* Password Field inline updating */}
+                          {/* Clinic/Unit Assignment */}
                           <td className="p-4">
-                            <input
-                              type="text"
-                              value={user.password || '1234'}
-                              onChange={(e) => onUpdateSystemUser(user.id, { password: e.target.value })}
-                              className={`w-24 text-[11px] font-mono font-bold rounded-xl px-2 py-1.5 text-center border transition-all ${
-                                darkMode 
-                                  ? 'bg-slate-800 border-slate-700 text-white focus:border-teal-500' 
-                                  : 'bg-white border-slate-200 text-slate-800 focus:border-teal-400 focus:bg-white'
-                              }`}
-                            />
+                            {isEditingThisUser && isDev ? (
+                              <select
+                                value={userEditClinicId}
+                                onChange={(e) => setUserEditClinicId(e.target.value)}
+                                className={`text-[11px] font-bold rounded-lg px-2 py-1 outline-none border transition-all ${
+                                  darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                {clinics.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            ) : (
+                              <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                                {userClinic ? userClinic.name : 'Nenhuma'}
+                              </span>
+                            )}
                           </td>
 
                           {/* Level of Access badge */}
                           <td className="p-4">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                              user.role === 'Admin' 
-                                ? 'bg-[#F27D26]/10 text-[#F27D26]' 
-                                : user.role === 'Fisio' 
-                                  ? 'bg-[#9BB0A5]/15 text-[#8A9F94] dark:text-[#9BB0A5]' 
-                                  : 'bg-[#A2C4D2]/20 text-indigo-700'
-                            }`}>
-                              <Shield className="w-3 h-3" />
-                              {user.role === 'Admin' ? 'Administrador' : user.role === 'Fisio' ? 'Fisioterapeuta' : 'Recepção'}
-                            </span>
+                            {isEditingThisUser ? (
+                              <select
+                                value={userEditRole}
+                                onChange={(e) => setUserEditRole(e.target.value as UserRole)}
+                                className={`text-[11px] font-bold rounded-lg px-2 py-1 outline-none border transition-all ${
+                                  darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200'
+                                }`}
+                              >
+                                <option value="Admin">Administrador (Total)</option>
+                                <option value="Fisio">Fisioterapeuta</option>
+                                <option value="Recepcao">Recepção</option>
+                                <option value="Desenvolvedor">Desenvolvedor</option>
+                              </select>
+                            ) : (
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                user.role === 'Admin' 
+                                  ? 'bg-[#F27D26]/10 text-[#F27D26]' 
+                                  : user.role === 'Fisio' 
+                                    ? 'bg-[#9BB0A5]/15 text-[#8A9F94] dark:text-[#9BB0A5]' 
+                                    : user.role === 'Desenvolvedor'
+                                      ? 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
+                                      : 'bg-[#A2C4D2]/20 text-indigo-700'
+                              }`}>
+                                <Shield className="w-3 h-3" />
+                                {user.role === 'Admin' ? 'Administrador' : user.role === 'Fisio' ? 'Fisioterapeuta' : user.role === 'Desenvolvedor' ? 'Desenvolvedor' : 'Recepção'}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Password Field inline updating */}
+                          <td className="p-4">
+                            {isEditingThisUser ? (
+                              <input
+                                type="text"
+                                value={userEditPassword}
+                                onChange={(e) => setUserEditPassword(e.target.value)}
+                                className={`w-20 text-[11px] font-mono font-bold rounded-xl px-2 py-1 border outline-none text-center ${
+                                  darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'
+                                }`}
+                              />
+                            ) : (
+                              <input
+                                type="text"
+                                value={user.password || '1234'}
+                                onChange={(e) => onUpdateSystemUser(user.id, { password: e.target.value })}
+                                className={`w-20 text-[11px] font-mono font-bold rounded-xl px-2 py-1 text-center border transition-all ${
+                                  darkMode 
+                                    ? 'bg-slate-800 border-slate-700 text-white focus:border-teal-500' 
+                                    : 'bg-white border-slate-200 text-slate-800 focus:border-teal-400 focus:bg-white'
+                                }`}
+                              />
+                            )}
                           </td>
 
                           {/* Active / Inactive switch status */}
@@ -708,17 +704,67 @@ export default function ClinicSettings({
                             </button>
                           </td>
 
-                          {/* Remove button */}
+                          {/* Action buttons */}
                           <td className="p-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => onDeleteSystemUser(user.id)}
-                              className="p-1 px-3 text-rose-600 hover:text-rose-800 font-semibold hover:bg-rose-50 rounded-xl transition-all cursor-pointer text-xs"
-                              disabled={activeClinicUsers.length <= 1}
-                              title={activeClinicUsers.length <= 1 ? "A clínica deve conter no mínimo 1 usuário ativo." : ""}
-                            >
-                              <Trash2 className="w-3.5 h-3.5 inline mr-1" /> Remover
-                            </button>
+                            <div className="flex items-center justify-end gap-1">
+                              {isEditingThisUser ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      onUpdateSystemUser(user.id, {
+                                        name: userEditName,
+                                        email: userEditEmail,
+                                        role: userEditRole,
+                                        password: userEditPassword,
+                                        clinicId: userEditClinicId
+                                      });
+                                      setEditingUserId(null);
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-emerald-500 text-white text-[10px] font-extrabold hover:bg-emerald-600 transition-all cursor-pointer"
+                                  >
+                                    Salvar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingUserId(null)}
+                                    className="px-2.5 py-1 rounded-lg bg-slate-350 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-[10px] font-extrabold hover:opacity-80 transition-all cursor-pointer"
+                                  >
+                                    Canc.
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingUserId(user.id);
+                                      setUserEditName(user.name);
+                                      setUserEditEmail(user.email);
+                                      setUserEditRole(user.role);
+                                      setUserEditPassword(user.password || '1234');
+                                      setUserEditClinicId(user.clinicId);
+                                    }}
+                                    className="p-1 px-2 text-[#8A9F94] hover:text-[#2D312E] dark:hover:text-white font-extrabold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all cursor-pointer text-[10px]"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (confirm(`Deseja realmente remover o colaborador "${user.name}"?`)) {
+                                        onDeleteSystemUser(user.id);
+                                      }
+                                    }}
+                                    className="p-1 px-2 text-rose-500 hover:text-rose-700 font-extrabold hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition-all cursor-pointer text-[10px]"
+                                    disabled={!isDev && activeClinicUsers.length <= 1}
+                                    title={!isDev && activeClinicUsers.length <= 1 ? "A clínica deve conter no mínimo 1 usuário ativo." : ""}
+                                  >
+                                    <Trash2 className="w-3 h-3 inline mr-0.5" /> Excluir
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </td>
 
                         </tr>

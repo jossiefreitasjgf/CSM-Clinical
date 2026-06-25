@@ -1,0 +1,229 @@
+{
+  "entities": {
+    "Clinic": {
+      "title": "Clinic",
+      "description": "Information about a tenant clinic subscribing to the SaaS platform.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "document": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "plan": { "type": "string", "enum": ["Bronze", "Prata", "Ouro"] },
+        "status": { "type": "string", "enum": ["Ativo", "Inativo"] },
+        "responsibleDoctor": { "type": "string" },
+        "financialManager": { "type": "string" },
+        "whatsapp": { "type": "string" }
+      },
+      "required": ["id", "name", "document", "plan", "status"]
+    },
+    "SystemUser": {
+      "title": "SystemUser",
+      "description": "Authorized clinical user associated with a tenant clinic.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clinicId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Fisio", "Recepcao", "Desenvolvedor"] },
+        "status": { "type": "string", "enum": ["Ativo", "Inativo"] },
+        "createdAt": { "type": "string" },
+        "password": { "type": "string" }
+      },
+      "required": ["id", "clinicId", "name", "email", "role", "status", "createdAt"]
+    },
+    "TherapeuticEvent": {
+      "title": "TherapeuticEvent",
+      "description": "Public or semi-private clinical events organized by a clinic.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clinicId": { "type": "string" },
+        "name": { "type": "string" },
+        "theme": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "price": { "type": "number" },
+        "maxParticipants": { "type": "number" },
+        "status": { "type": "string", "enum": ["Aberto", "Encerrado", "Cancelado"] },
+        "image": { "type": "string" }
+      },
+      "required": ["id", "clinicId", "name", "theme", "date", "time", "price", "maxParticipants", "status"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "A pediatric patient registered in the clinic CRM.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clinicId": { "type": "string" },
+        "photo": { "type": "string" },
+        "name": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "gender": { "type": "string", "enum": ["M", "F", "Outro"] },
+        "fatherName": { "type": "string" },
+        "motherName": { "type": "string" },
+        "guardianName": { "type": "string" },
+        "cpf": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "diagnosis": { "type": "string" },
+        "limitations": { "type": "string" },
+        "allergies": { "type": "string" },
+        "medications": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "clinicId", "name", "birthDate", "gender", "guardianName", "phone", "createdAt"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "Event participant registration submitted by parents or receptionist.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clinicId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "childId": { "type": "string" },
+        "childName": { "type": "string" },
+        "parentName": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pendente", "Aprovado", "Cancelado"] },
+        "paymentReceiptName": { "type": "string" },
+        "paymentReceiptSize": { "type": "string" },
+        "ageCalculated": { "type": "number" }
+      },
+      "required": ["id", "clinicId", "eventId", "childId", "childName", "parentName", "registrationNumber", "date", "status"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Attendance logs of therapeutic events.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "eventId": { "type": "string" },
+        "patientId": { "type": "string" },
+        "present": { "type": "boolean" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "eventId", "patientId", "present"]
+    },
+    "EvolutionaryAssessment": {
+      "title": "EvolutionaryAssessment",
+      "description": "Clinical progression chart for patients motor and social skills.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "author": { "type": "string" },
+        "coord": { "type": "number" },
+        "equilibrio: ": { "type": "number" },
+        "mobilidade": { "type": "number" },
+        "forca": { "type": "number" },
+        "motricidadeFina": { "type": "number" },
+        "interacao": { "type": "number" },
+        "comunicacao": { "type": "number" },
+        "participacaoGrupo": { "type": "number" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "patientId", "date", "author"]
+    },
+    "MedicalRecord": {
+      "title": "MedicalRecord",
+      "description": "Confidential anamnesis and reports files for the patient.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "patientId": { "type": "string" },
+        "date": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["Anamnese", "Evolução", "Avaliação", "Relatório", "Documento"] },
+        "description": { "type": "string" },
+        "author": { "type": "string" }
+      },
+      "required": ["id", "patientId", "date", "title", "type", "description", "author"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Schedules and status of clinical treatment sessions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clinicId": { "type": "string" },
+        "patientId": { "type": "string" },
+        "patientName": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "type": { "type": "string" },
+        "price": { "type": "number" },
+        "status": { "type": "string", "enum": ["Agendado", "Confirmado", "Reagendado", "Cancelado", "Realizado"] }
+      },
+      "required": ["id", "clinicId", "patientId", "patientName", "date", "time", "type", "price", "status"]
+    },
+    "FinancialTransaction": {
+      "title": "FinancialTransaction",
+      "description": "Cash flows consisting of incoming and outgoing transaction entries.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clinicId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Receita", "Despesa"] },
+        "category": { "type": "string" },
+        "value": { "type": "number" },
+        "date": { "type": "string" },
+        "description": { "type": "string" },
+        "referenceId": { "type": "string" }
+      },
+      "required": ["id", "clinicId", "type", "category", "value", "date", "description"]
+    }
+  },
+  "firestore": {
+    "clinics": {
+      "schema": "Clinic",
+      "description": "Tenant clinics catalog"
+    },
+    "users": {
+      "schema": "SystemUser",
+      "description": "Tenant system users indexed by email"
+    },
+    "events": {
+      "schema": "TherapeuticEvent",
+      "description": "Events and workshops organized by clinics"
+    },
+    "patients": {
+      "schema": "Patient",
+      "description": "Pediatric patient CRM data"
+    },
+    "registrations": {
+      "schema": "Registration",
+      "description": "Public event submissions"
+    },
+    "attendances": {
+      "schema": "Attendance",
+      "description": "Event presence and performance log"
+    },
+    "assessments": {
+      "schema": "EvolutionaryAssessment",
+      "description": "Clinical progression metric charts"
+    },
+    "medicalRecords": {
+      "schema": "MedicalRecord",
+      "description": "Clinical files, anamnesis, and medical documents"
+    },
+    "appointments": {
+      "schema": "Appointment",
+      "description": "Clinical calendar schedule slots"
+    },
+    "transactions": {
+      "schema": "FinancialTransaction",
+      "description": "Financial accounting ledgers"
+    }
+  }
+}

@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper: Is signed in?
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: Is the database unseeded?
+    function isUnseeded() {
+      return !exists(/databases/$(database)/documents/clinics/clinic-1);
+    }
+
+    // Helper: Is the current user the Developer?
+    function isDeveloper() {
+      return isSignedIn() && request.auth.token.email.lower() == 'jossiefreitas.jgf@gmail.com';
+    }
+
+    // Helper: Get the current user's profile data
+    function currentUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.token.email.lower())).data;
+    }
+
+    // Helper: Is the current user's account active?
+    function isUserActive() {
+      return isDeveloper() || (isSignedIn() && currentUserData().status == 'Ativo');
+    }
+
+    // Helper: Get current user's clinic ID
+    function userClinicId() {
+      return currentUserData().clinicId;
+    }
+
+    // Helper: Get current user's role
+    function userRole() {
+      return currentUserData().role;
+    }
+
+    // Helper: Get existing document data if it exists
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. Clinics Collection
+    match /clinics/{clinicId} {
+      allow read: if true;
+      allow write: if isUnseeded() || isDeveloper();
+    }
+
+    // 2. Users Collection
+    match /users/{email} {
+      allow get: if isUnseeded() || !isSignedIn() || (isSignedIn() && (isDeveloper() || email.lower() == request.auth.token.email.lower() || existing().clinicId == userClinicId()));
+      allow list: if isUnseeded() || (isUserActive() && (isDeveloper() || resource.data.clinicId == userClinicId()));
+      allow write: if isUnseeded() || (isUserActive() && (isDeveloper() || (userRole() == 'Admin' && (resource == null || existing().clinicId == userClinicId()) && (request.resource == null || request.resource.data.clinicId == userClinicId()))));
+    }
+
+    // 3. Events Collection
+    match /events/{eventId} {
+      allow read: if isUnseeded() || (isSignedIn() && isUserActive() && (isDeveloper() || resource.data.clinicId == userClinicId())) || (resource != null && resource.data.status == 'Aberto');
+      allow write: if isUnseeded() || (isUserActive() && (isDeveloper() || (userRole() == 'Admin' && (resource == null || existing().clinicId == userClinicId()) && (request.resource == null || request.resource.data.clinicId == userClinicId()))));
+    }
+
+    // 4. Patients Collection
+    match /patients/{patientId} {
+      allow read: if isUnseeded() || (isUserActive() && (isDeveloper() || resource.data.clinicId == userClinicId()));
+      allow write: if isUnseeded() || (isUserActive() && (isDeveloper() || ((resource == null || existing().clinicId == userClinicId()) && (request.resource == null || request.resource.data.clinicId == userClinicId()))));
+    }
+
+    // 5. Registrations Collection
+    match /registrations/{registrationId} {
+      allow read: if isUnseeded() || (isUserActive() && (isDeveloper() || resource.data.clinicId == userClinicId()));
+      allow create: if isUnseeded() || request.resource != null;
+      allow update, delete: if isUnseeded() || (isUserActive() && (isDeveloper() || resource.data.clinicId == userClinicId()));
+    }
+
+    // 6. Attendances Collection
+    match /attendances/{attendanceId} {
+      allow read: if isUnseeded() || (isUserActive() && (isDeveloper() || get(/databases/$(database)/documents/events/$(resource.data.eventId)).data.clinicId == userClinicId()));
+      allow write: if isUnseeded() || (isUserActive() && (isDeveloper() || get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.clinicId == userClinicId()));
+    }
+
+    // 7. Assessments Collection (Restricted to Admin and Fisio)
+    match /assessments/{assessmentId} {
+      allow read: if isUnseeded() || (isUserActive() && (isDeveloper() || ((userRole() == 'Admin' || userRole() == 'Fisio') && get(/databases/$(database)/documents/patients/$(resource.data.patientId)).data.clinicId == userClinicId())));
+      allow write: if isUnseeded() || (isUserActive() && (isDeveloper() || ((userRole() == 'Admin' || userRole() == 'Fisio') && get(/databases/$(database)/documents/patients/$(request.resource.data.patientId)).data.clinicId == userClinicId())));
+    }
+
+    // 8. Medical Records Collection (Restricted to Admin and Fisio)
+    match /medicalRecords/{recordId} {
+      allow read: if isUnseeded() || (isUserActive() && (isDeveloper() || ((userRole() == 'Admin' || userRole() == 'Fisio') && get(/databases/$(database)/documents/patients/$(resource.data.patientId)).data.clinicId == userClinicId())));
+      allow write: if isUnseeded() || (isUserActive() && (isDeveloper() || ((userRole() == 'Admin' || userRole() == 'Fisio') && get(/databases/$(database)/documents/patients/$(request.resource.data.patientId)).data.clinicId == userClinicId())));
+    }
+
+    // 9. Appointments Collection
+    match /appointments/{appointmentId} {
+      allow read: if isUnseeded() || (isUserActive() && (isDeveloper() || resource.data.clinicId == userClinicId()));
+      allow write: if isUnseeded() || (isUserActive() && (isDeveloper() || ((resource == null || existing().clinicId == userClinicId()) && (request.resource == null || request.resource.data.clinicId == userClinicId()))));
+    }
+
+    // 10. Transactions Collection (Restricted to Admin)
+    match /transactions/{transactionId} {
+      allow read: if isUnseeded() || (isUserActive() && (isDeveloper() || (userRole() == 'Admin' && resource.data.clinicId == userClinicId())));
+      allow write: if isUnseeded() || (isUserActive() && (isDeveloper() || (userRole() == 'Admin' && (resource == null || existing().clinicId == userClinicId()) && (request.resource == null || request.resource.data.clinicId == userClinicId()))));
+    }
+  }
+}
